@@ -1,4 +1,7 @@
 # Mapping A Website's Internal Links
+
+![Script preview image](https://files.catbox.moe/nx43nm.png)
+
 Use Python to map a website's internal links. And then apply D3 to visualize those connections as a network graph.
 
 ## Set Up
