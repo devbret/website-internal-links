@@ -16,81 +16,114 @@
                 stroke-width: 1.5px;
                 cursor: pointer;
             }
+            .dimmed {
+                opacity: 0.2;
+            }
+            .highlight {
+                opacity: 1;
+            }
+            .tooltip {
+                position: absolute;
+                text-align: center;
+                width: auto;
+                height: auto;
+                padding: 5px;
+                font-size: 14px;
+                background: lightgray;
+                border: 1px solid #ccc;
+                pointer-events: none;
+                opacity: 0;
+            }
             svg {
                 border: 1px solid black;
             }
         </style>
     </head>
-    <body>
-        <script>
-            d3.json('links.json').then(function (links) {
-                const nodes = Array.from(new Set(Object.keys(links).concat(...Object.values(links).flat())));
-                const nodeData = nodes.map((node) => ({ id: node }));
-                const linkData = [];
 
-                Object.keys(links).forEach((source) => {
-                    links[source].forEach((target) => {
-                        linkData.push({ source, target });
+    <body>
+        <div id="tooltip" class="tooltip"></div>
+        <script>
+            d3.json('links.json').then(function (site_structure) {
+                const nodes = [];
+                const links = [];
+                Object.keys(site_structure).forEach((source) => {
+                    nodes.push({ id: source, title: site_structure[source].title });
+
+                    site_structure[source].links.forEach((target) => {
+                        links.push({ source, target });
+                        if (!nodes.some((node) => node.id === target)) {
+                            nodes.push({ id: target, title: site_structure[target]?.title || 'No title' });
+                        }
                     });
                 });
-
                 const width = window.innerWidth;
                 const height = window.innerHeight;
                 const svg = d3.select('body').append('svg').attr('width', width).attr('height', height);
-
-                const zoomHandler = d3.zoom().on('zoom', (event) => {
-                    container.attr('transform', event.transform);
-                });
-
                 const container = svg.append('g');
-
+                const zoomHandler = d3.zoom().on('zoom', (event) => container.attr('transform', event.transform));
                 svg.call(zoomHandler).call(zoomHandler.transform, d3.zoomIdentity);
-
                 const simulation = d3
-                    .forceSimulation(nodeData)
+                    .forceSimulation(nodes)
                     .force(
                         'link',
                         d3
-                            .forceLink(linkData)
+                            .forceLink(links)
                             .id((d) => d.id)
                             .distance(100)
                     )
                     .force('charge', d3.forceManyBody())
                     .force('center', d3.forceCenter(width / 2, height / 2));
-
-                const link = container.append('g').attr('class', 'links').selectAll('line').data(linkData).enter().append('line').attr('class', 'link');
-
+                const link = container.append('g').attr('class', 'links').selectAll('line').data(links).enter().append('line').attr('class', 'link');
                 const node = container
                     .append('g')
                     .attr('class', 'nodes')
                     .selectAll('circle')
-                    .data(nodeData)
+                    .data(nodes)
                     .enter()
                     .append('circle')
                     .attr('r', 5)
                     .attr('fill', 'red')
+                    .on('mouseover', mouseover)
+                    .on('mouseout', mouseout)
+                    .on('click', (event, d) => window.open(d.id, '_blank'))
                     .call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended));
-
                 simulation.on('tick', () => {
                     link.attr('x1', (d) => d.source.x)
                         .attr('y1', (d) => d.source.y)
                         .attr('x2', (d) => d.target.x)
                         .attr('y2', (d) => d.target.y);
-
                     node.attr('cx', (d) => d.x).attr('cy', (d) => d.y);
                 });
+                function mouseover(event, d) {
+                    d3.select('#tooltip')
+                        .style('opacity', 1)
+                        .html(`Title: ${d.title}`)
+                        .style('left', `${event.pageX}px`)
+                        .style('top', `${event.pageY - 28}px`);
+                    node.classed('dimmed', true);
+                    link.classed('dimmed', true);
+                    node.filter((n) => n === d || links.some((l) => (l.source === d && l.target === n) || (l.target === d && l.source === n)))
+                        .classed('dimmed', false)
+                        .classed('highlight', true);
+                    link.filter((l) => l.source === d || l.target === d)
+                        .classed('dimmed', false)
+                        .classed('highlight', true);
+                }
+                function mouseout() {
+                    d3.select('#tooltip').style('opacity', 0);
 
+                    node.classed('dimmed', false).classed('highlight', false);
+                    link.classed('dimmed', false).classed('highlight', false);
+                }
                 function dragstarted(event, d) {
                     if (!event.active) simulation.alphaTarget(0.3).restart();
                     d.fx = d.x;
                     d.fy = d.y;
                 }
-
                 function dragged(event, d) {
                     d.fx = event.x;
                     d.fy = event.y;
                 }
-
                 function dragended(event, d) {
                     if (!event.active) simulation.alphaTarget(0);
                     d.fx = null;
