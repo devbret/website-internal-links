@@ -1,23 +1,34 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <title>Mapping A Website's Internal Links</title>
         <script src="https://d3js.org/d3.v6.min.js"></script>
         <style>
+            * {
+                font-family: 'Arial', sans-serif;
+            }
             body {
                 overflow: hidden;
                 margin: 0;
+                background: #f0f0f0;
             }
             .link {
-                stroke: #999;
+                stroke: #bbb;
                 stroke-opacity: 0.6;
+                stroke-width: 2px;
             }
             .node {
-                stroke: #fff;
+                stroke: #666;
                 stroke-width: 1.5px;
                 cursor: pointer;
+                transition: transform 0.1s;
+            }
+            .node:hover {
+                transform: scale(1.2);
+                stroke-width: 2px;
             }
             .dimmed {
-                opacity: 0.2;
+                opacity: 0.1;
             }
             .highlight {
                 opacity: 1;
@@ -25,21 +36,23 @@
             .tooltip {
                 position: absolute;
                 text-align: center;
-                width: auto;
-                height: auto;
-                padding: 5px;
-                font-size: 14px;
-                background: lightgray;
-                border: 1px solid #ccc;
+                padding: 8px 10px;
+                font-size: 13px;
+                background: #ffffff;
+                border: 1px solid #ddd;
+                box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
                 pointer-events: none;
-                opacity: 0;
+                transition: opacity 0.2s;
+                border-radius: 4px;
             }
             svg {
-                border: 1px solid black;
+                border: none;
+                display: block;
+                width: 100%;
+                height: auto;
             }
         </style>
     </head>
-
     <body>
         <div id="tooltip" class="tooltip"></div>
         <script>
@@ -52,7 +65,7 @@
                     site_structure[source].links.forEach((target) => {
                         links.push({ source, target });
                         if (!nodes.some((node) => node.id === target)) {
-                            nodes.push({ id: target, title: site_structure[target]?.title || 'No title' });
+                            nodes.push({ id: target, title: site_structure[target]?.title || 'No Title Found' });
                         }
                     });
                 });
@@ -69,9 +82,9 @@
                         d3
                             .forceLink(links)
                             .id((d) => d.id)
-                            .distance(100)
+                            .distance(193)
                     )
-                    .force('charge', d3.forceManyBody())
+                    .force('charge', d3.forceManyBody().strength(-123))
                     .force('center', d3.forceCenter(width / 2, height / 2));
                 const link = container.append('g').attr('class', 'links').selectAll('line').data(links).enter().append('line').attr('class', 'link');
                 const node = container
@@ -81,8 +94,10 @@
                     .data(nodes)
                     .enter()
                     .append('circle')
-                    .attr('r', 5)
-                    .attr('fill', 'red')
+                    .attr('r', 8)
+                    .attr('fill', 'magenta')
+                    .attr('stroke', 'black')
+                    .attr('stroke-width', 2)
                     .on('mouseover', mouseover)
                     .on('mouseout', mouseout)
                     .on('click', (event, d) => window.open(d.id, '_blank'))
@@ -97,7 +112,7 @@
                 function mouseover(event, d) {
                     d3.select('#tooltip')
                         .style('opacity', 1)
-                        .html(`Title: ${d.title}`)
+                        .html(`${d.title} - ${d.id}`)
                         .style('left', `${event.pageX}px`)
                         .style('top', `${event.pageY - 28}px`);
                     node.classed('dimmed', true);
@@ -111,7 +126,6 @@
                 }
                 function mouseout() {
                     d3.select('#tooltip').style('opacity', 0);
-
                     node.classed('dimmed', false).classed('highlight', false);
                     link.classed('dimmed', false).classed('highlight', false);
                 }
