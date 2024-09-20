@@ -6,7 +6,7 @@ import json
 def is_internal(url, base):
     return urlparse(url).netloc == urlparse(base).netloc
 
-def crawl_site(start_url, max_links=100):
+def crawl_site(start_url, max_links=33):
     visited = set()
     site_structure = {}
 

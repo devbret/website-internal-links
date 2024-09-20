@@ -6,50 +6,84 @@
         <style>
             * {
                 font-family: 'Arial', sans-serif;
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
             }
+
             body {
                 overflow: hidden;
                 margin: 0;
-                background: #f0f0f0;
+                background-color: #f9f9f9;
+                color: #333;
+                font-size: 16px;
+                line-height: 1.6;
             }
+
             .link {
-                stroke: #bbb;
-                stroke-opacity: 0.6;
+                stroke: #888;
+                stroke-opacity: 0.75;
                 stroke-width: 2px;
+                transition: stroke 0.2s, stroke-opacity 0.2s;
             }
+
             .node {
-                stroke: #666;
+                stroke: #555;
                 stroke-width: 1.5px;
                 cursor: pointer;
-                transition: transform 0.1s;
+                fill: #0077cc;
+                transition: transform 0.2s, stroke-width 0.2s, fill 0.2s;
             }
+
             .node:hover {
-                transform: scale(1.2);
-                stroke-width: 2px;
+                transform: scale(1.15);
+                stroke-width: 2.5px;
+                fill: #ff6600;
             }
+
             .dimmed {
-                opacity: 0.1;
+                opacity: 0.2;
+                transition: opacity 0.2s ease-in-out;
             }
+
             .highlight {
                 opacity: 1;
+                stroke: black;
+                stroke-width: 2px;
             }
+
             .tooltip {
                 position: absolute;
                 text-align: center;
-                padding: 8px 10px;
-                font-size: 13px;
-                background: #ffffff;
+                padding: 10px 12px;
+                font-size: 14px;
+                background-color: #ffffff;
                 border: 1px solid #ddd;
-                box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+                border-radius: 6px;
+                box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
                 pointer-events: none;
-                transition: opacity 0.2s;
-                border-radius: 4px;
+                opacity: 0;
+                transition: opacity 0.3s ease, transform 0.3s ease;
+                transform: translateY(-10px);
             }
+
+            .tooltip-visible {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
             svg {
-                border: none;
                 display: block;
                 width: 100%;
-                height: auto;
+                height: 100%;
+                background-color: #f0f0f0;
+            }
+
+            @media (max-width: 768px) {
+                .tooltip {
+                    font-size: 12px;
+                    padding: 8px 10px;
+                }
             }
         </style>
     </head>
@@ -59,6 +93,7 @@
             d3.json('links.json').then(function (site_structure) {
                 const nodes = [];
                 const links = [];
+
                 Object.keys(site_structure).forEach((source) => {
                     nodes.push({ id: source, title: site_structure[source].title });
 
@@ -69,12 +104,15 @@
                         }
                     });
                 });
+
                 const width = window.innerWidth;
                 const height = window.innerHeight;
+
                 const svg = d3.select('body').append('svg').attr('width', width).attr('height', height);
                 const container = svg.append('g');
                 const zoomHandler = d3.zoom().on('zoom', (event) => container.attr('transform', event.transform));
                 svg.call(zoomHandler).call(zoomHandler.transform, d3.zoomIdentity);
+
                 const simulation = d3
                     .forceSimulation(nodes)
                     .force(
@@ -82,11 +120,13 @@
                         d3
                             .forceLink(links)
                             .id((d) => d.id)
-                            .distance(193)
+                            .distance(293)
                     )
                     .force('charge', d3.forceManyBody().strength(-123))
                     .force('center', d3.forceCenter(width / 2, height / 2));
+
                 const link = container.append('g').attr('class', 'links').selectAll('line').data(links).enter().append('line').attr('class', 'link');
+
                 const node = container
                     .append('g')
                     .attr('class', 'nodes')
@@ -94,7 +134,7 @@
                     .data(nodes)
                     .enter()
                     .append('circle')
-                    .attr('r', 8)
+                    .attr('r', 13)
                     .attr('fill', 'magenta')
                     .attr('stroke', 'black')
                     .attr('stroke-width', 2)
@@ -102,6 +142,7 @@
                     .on('mouseout', mouseout)
                     .on('click', (event, d) => window.open(d.id, '_blank'))
                     .call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended));
+
                 simulation.on('tick', () => {
                     link.attr('x1', (d) => d.source.x)
                         .attr('y1', (d) => d.source.y)
@@ -109,35 +150,48 @@
                         .attr('y2', (d) => d.target.y);
                     node.attr('cx', (d) => d.x).attr('cy', (d) => d.y);
                 });
+
                 function mouseover(event, d) {
+                    const connectedLinks = links.filter((l) => l.source.id === d.id || l.target.id === d.id).length;
+
                     d3.select('#tooltip')
                         .style('opacity', 1)
-                        .html(`${d.title} - ${d.id}`)
+                        .html(`"${d.title}" - ${d.id} - ${connectedLinks} Connections`)
                         .style('left', `${event.pageX}px`)
                         .style('top', `${event.pageY - 28}px`);
+
+                    d3.select(this).style('cursor', 'pointer');
+
                     node.classed('dimmed', true);
                     link.classed('dimmed', true);
+
                     node.filter((n) => n === d || links.some((l) => (l.source === d && l.target === n) || (l.target === d && l.source === n)))
                         .classed('dimmed', false)
                         .classed('highlight', true);
+
                     link.filter((l) => l.source === d || l.target === d)
                         .classed('dimmed', false)
                         .classed('highlight', true);
                 }
+
                 function mouseout() {
                     d3.select('#tooltip').style('opacity', 0);
                     node.classed('dimmed', false).classed('highlight', false);
                     link.classed('dimmed', false).classed('highlight', false);
+                    d3.select(this).style('cursor', 'auto');
                 }
+
                 function dragstarted(event, d) {
                     if (!event.active) simulation.alphaTarget(0.3).restart();
                     d.fx = d.x;
                     d.fy = d.y;
                 }
+
                 function dragged(event, d) {
                     d.fx = event.x;
                     d.fy = event.y;
                 }
+
                 function dragended(event, d) {
                     if (!event.active) simulation.alphaTarget(0);
                     d.fx = null;
