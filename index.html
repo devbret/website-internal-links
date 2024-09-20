@@ -56,7 +56,7 @@
                 position: absolute;
                 text-align: center;
                 padding: 10px 12px;
-                font-size: 14px;
+                font-size: 12px;
                 background-color: #ffffff;
                 border: 1px solid #ddd;
                 border-radius: 6px;
@@ -65,6 +65,7 @@
                 opacity: 0;
                 transition: opacity 0.3s ease, transform 0.3s ease;
                 transform: translateY(-10px);
+                max-width: 500px;
             }
 
             .tooltip-visible {
@@ -94,13 +95,29 @@
                 const nodes = [];
                 const links = [];
 
+                function getNodeData(url) {
+                    const data = site_structure[url] || {};
+                    return {
+                        id: url,
+                        title: data.title || 'No Title Found',
+                        meta_description: data.meta_description || 'No Meta Description',
+                        meta_keywords: data.meta_keywords || 'No Meta Keywords',
+                        h1_tags: data.h1_tags || [],
+                        word_count: data.word_count || 0,
+                        status_code: data.status_code || '',
+                        response_time: data.response_time || 0,
+                    };
+                }
+
                 Object.keys(site_structure).forEach((source) => {
-                    nodes.push({ id: source, title: site_structure[source].title });
+                    if (!nodes.some((node) => node.id === source)) {
+                        nodes.push(getNodeData(source));
+                    }
 
                     site_structure[source].links.forEach((target) => {
                         links.push({ source, target });
                         if (!nodes.some((node) => node.id === target)) {
-                            nodes.push({ id: target, title: site_structure[target]?.title || 'No Title Found' });
+                            nodes.push(getNodeData(target));
                         }
                     });
                 });
@@ -120,9 +137,9 @@
                         d3
                             .forceLink(links)
                             .id((d) => d.id)
-                            .distance(293)
+                            .distance(150)
                     )
-                    .force('charge', d3.forceManyBody().strength(-123))
+                    .force('charge', d3.forceManyBody().strength(-300))
                     .force('center', d3.forceCenter(width / 2, height / 2));
 
                 const link = container.append('g').attr('class', 'links').selectAll('line').data(links).enter().append('line').attr('class', 'link');
@@ -134,7 +151,7 @@
                     .data(nodes)
                     .enter()
                     .append('circle')
-                    .attr('r', 13)
+                    .attr('r', 10)
                     .attr('fill', 'magenta')
                     .attr('stroke', 'black')
                     .attr('stroke-width', 2)
@@ -154,10 +171,22 @@
                 function mouseover(event, d) {
                     const connectedLinks = links.filter((l) => l.source.id === d.id || l.target.id === d.id).length;
 
+                    const tooltipContent = `
+                        <strong>Title:</strong> ${d.title}<br/>
+                        <strong>URL:</strong> <a href="${d.id}" target="_blank">${d.id}</a><br/>
+                        <strong>Connections:</strong> ${connectedLinks}<br/>
+                        <strong>Meta Description:</strong> ${d.meta_description}<br/>
+                        <strong>Meta Keywords:</strong> ${d.meta_keywords}<br/>
+                        <strong>H1 Tags:</strong> ${d.h1_tags.join(', ') || 'None'}<br/>
+                        <strong>Word Count:</strong> ${d.word_count}<br/>
+                        <strong>Status Code:</strong> ${d.status_code}<br/>
+                        <strong>Response Time:</strong> ${d.response_time.toFixed(2)} seconds
+                    `;
+
                     d3.select('#tooltip')
                         .style('opacity', 1)
-                        .html(`"${d.title}" - ${d.id} - ${connectedLinks} Connections`)
-                        .style('left', `${event.pageX}px`)
+                        .html(tooltipContent)
+                        .style('left', `${event.pageX + 15}px`)
                         .style('top', `${event.pageY - 28}px`);
 
                     d3.select(this).style('cursor', 'pointer');
@@ -165,11 +194,13 @@
                     node.classed('dimmed', true);
                     link.classed('dimmed', true);
 
-                    node.filter((n) => n === d || links.some((l) => (l.source === d && l.target === n) || (l.target === d && l.source === n)))
+                    node.filter(
+                        (n) => n === d || links.some((l) => (l.source.id === d.id && l.target.id === n.id) || (l.target.id === d.id && l.source.id === n.id))
+                    )
                         .classed('dimmed', false)
                         .classed('highlight', true);
 
-                    link.filter((l) => l.source === d || l.target === d)
+                    link.filter((l) => l.source.id === d.id || l.target.id === d.id)
                         .classed('dimmed', false)
                         .classed('highlight', true);
                 }

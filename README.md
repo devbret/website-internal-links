@@ -2,14 +2,14 @@
 
 ![Preview Of Resulting Visualization](https://hosting.photobucket.com/images/i/bernhoftbret/website-internal-links-mapped.png)
 
-Use Python to map a website's internal links. And then apply D3 to visualize those connections as a network graph.
+Use Python to map a website's internal links. And then apply D3 to visualize those connections as an interactive network graph.
 
 ## Set Up
 
-### Programs Needed 
+### Programs Needed
 
-- [Git](https://git-scm.com/downloads)
-- [Python](https://www.python.org/downloads/) (When installing on Windows, make sure you check the ["Add python 3.xx to PATH"](https://hosting.photobucket.com/images/i/bernhoftbret/python.png) box.)
+-   [Git](https://git-scm.com/downloads)
+-   [Python](https://www.python.org/downloads/) (When installing on Windows, make sure you check the ["Add python 3.xx to PATH"](https://hosting.photobucket.com/images/i/bernhoftbret/python.png) box.)
 
 ### Steps
 
@@ -21,3 +21,4 @@ Use Python to map a website's internal links. And then apply D3 to visualize tho
 6. Edit the app.py file on line 49, to include the website that you would like to visualize.
 7. Run the script with the command `python3 app.py`.
 8. To view the website's connections in the index.html file you will need to run a local web server. To do this run `python3 -m http.server`.
+9. Once the network map has been launched, hover over any given node for more information about the particular web page. By clicking on a node, you will be sent to the related URL address.
