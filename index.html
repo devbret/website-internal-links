@@ -54,7 +54,7 @@
 
             .tooltip {
                 position: absolute;
-                text-align: center;
+                text-align: left;
                 padding: 10px 12px;
                 font-size: 12px;
                 background-color: #ffffff;
@@ -66,6 +66,7 @@
                 transition: opacity 0.3s ease, transform 0.3s ease;
                 transform: translateY(-10px);
                 max-width: 500px;
+                min-width: 350px;
             }
 
             .tooltip-visible {
@@ -99,13 +100,19 @@
                     const data = site_structure[url] || {};
                     return {
                         id: url,
-                        title: data.title || 'No Title Found',
-                        meta_description: data.meta_description || 'No Meta Description',
-                        meta_keywords: data.meta_keywords || 'No Meta Keywords',
+                        title: data.title || '',
+                        meta_description: data.meta_description || '',
+                        meta_keywords: data.meta_keywords || '',
                         h1_tags: data.h1_tags || [],
                         word_count: data.word_count || 0,
                         status_code: data.status_code || '',
                         response_time: data.response_time || 0,
+                        readability_score: data.readability_score || 0,
+                        sentiment: data.sentiment || 0,
+                        keyword_density: data.keyword_density || {},
+                        image_count: data.image_count || 0,
+                        internal_links: data.internal_links || [],
+                        external_links: data.external_links || [],
                     };
                 }
 
@@ -114,7 +121,7 @@
                         nodes.push(getNodeData(source));
                     }
 
-                    site_structure[source].links.forEach((target) => {
+                    site_structure[source].internal_links.forEach((target) => {
                         links.push({ source, target });
                         if (!nodes.some((node) => node.id === target)) {
                             nodes.push(getNodeData(target));
@@ -171,6 +178,14 @@
                 function mouseover(event, d) {
                     const connectedLinks = links.filter((l) => l.source.id === d.id || l.target.id === d.id).length;
 
+                    const keywordDensityFormatted =
+                        Object.entries(d.keyword_density)
+                            .filter(([keyword, density]) => density > 0)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 5)
+                            .map(([keyword, density]) => `${keyword}: ${(density * 100).toFixed(2)}%`)
+                            .join('<br/>') || '';
+
                     const tooltipContent = `
                         <strong>Title:</strong> ${d.title}<br/>
                         <strong>URL:</strong> <a href="${d.id}" target="_blank">${d.id}</a><br/>
@@ -179,8 +194,14 @@
                         <strong>Meta Keywords:</strong> ${d.meta_keywords}<br/>
                         <strong>H1 Tags:</strong> ${d.h1_tags.join(', ') || 'None'}<br/>
                         <strong>Word Count:</strong> ${d.word_count}<br/>
+                        <strong>Unigram Density:</strong><br/>${keywordDensityFormatted}<br/>
+                        <strong>Readability Score:</strong> ${d.readability_score.toFixed(2)}<br/>
+                        <strong>Sentiment:</strong> ${d.sentiment.toFixed(2)}<br/>
+                        <strong>Image Count:</strong> ${d.image_count}<br/>
                         <strong>Status Code:</strong> ${d.status_code}<br/>
-                        <strong>Response Time:</strong> ${d.response_time.toFixed(2)} seconds
+                        <strong>Response Time:</strong> ${d.response_time.toFixed(2)} seconds<br/>
+                        <strong>Number Of Internal Links:</strong> ${d.internal_links.length} links<br/>
+                        <strong>Number Of External Links:</strong> ${d.external_links.length} links
                     `;
 
                     d3.select('#tooltip')

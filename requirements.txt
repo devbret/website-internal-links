@@ -1,7 +1,16 @@
 beautifulsoup4==4.12.0
 certifi==2024.8.30
 charset-normalizer==3.3.2
+click==8.1.7
 idna==3.10
+joblib==1.4.2
+nltk==3.9.1
+pyphen==0.16.0
+regex==2024.9.11
 requests==2.31.0
+setuptools==75.1.0
 soupsieve==2.6
+textblob==0.18.0.post0
+textstat==0.7.4
+tqdm==4.66.5
 urllib3==2.2.3
