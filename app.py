@@ -11,7 +11,6 @@ from collections import Counter
 import re
 
 nltk.download('punkt')
-nltk.download('punkt_tab')
 nltk.download('stopwords')
 
 def is_internal(url, base):
@@ -22,10 +21,9 @@ def crawl_site(start_url, max_links=25):
     site_structure = {}
 
     def crawl(url):
-        if len(visited) >= max_links:
+        if len(visited) >= max_links or url in visited:
             return
-        if url in visited:
-            return
+
         visited.add(url)
         print(f"Crawling: {url}")
 
@@ -66,19 +64,20 @@ def crawl_site(start_url, max_links=25):
 
             most_common = word_freq.most_common(10)
 
-            keyword_density = {}
-            for word, count in most_common:
-                density = count / total_filtered_words if total_filtered_words else 0
-                keyword_density[word] = density
+            keyword_density = {word: count / total_filtered_words for word, count in most_common}
 
             image_count = len(soup.find_all('img'))
+            script_count = len(soup.find_all('script'))
+            stylesheet_count = len(soup.find_all('link', rel='stylesheet'))
+            has_viewport_meta = bool(soup.find('meta', attrs={'name': 'viewport'}))
+            heading_count = len(soup.find_all(['h2', 'h3', 'h4', 'h5', 'h6']))
+            paragraph_count = len(soup.find_all('p'))
 
             internal_links = []
             external_links = []
+
             for link in soup.find_all('a', href=True):
-                href = urljoin(url, link.get('href'))
-                href = href.split('#')[0]
-                href = href.rstrip('/')
+                href = urljoin(url, link.get('href')).split('#')[0].rstrip('/')
                 if is_internal(href, start_url):
                     internal_links.append(href)
                     if len(visited) < max_links:
@@ -96,6 +95,11 @@ def crawl_site(start_url, max_links=25):
                 "sentiment": sentiment,
                 "keyword_density": keyword_density,
                 "image_count": image_count,
+                "script_count": script_count,
+                "stylesheet_count": stylesheet_count,
+                "has_viewport_meta": has_viewport_meta,
+                "heading_count": heading_count,
+                "paragraph_count": paragraph_count,
                 "status_code": status_code,
                 "response_time": response_time,
                 "internal_links": internal_links,

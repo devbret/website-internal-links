@@ -17,6 +17,11 @@ d3.json("links.json").then(function (site_structure) {
       sentiment: data.sentiment || 0,
       keyword_density: data.keyword_density || {},
       image_count: data.image_count || 0,
+      script_count: data.script_count || 0,
+      stylesheet_count: data.stylesheet_count || 0,
+      has_viewport_meta: data.has_viewport_meta || false,
+      heading_count: data.heading_count || 0,
+      paragraph_count: data.paragraph_count || 0,
       internal_links: data.internal_links || [],
       external_links: data.external_links || [],
     };
@@ -130,6 +135,13 @@ d3.json("links.json").then(function (site_structure) {
         )}<br/>
         <strong>Sentiment:</strong> ${d.sentiment.toFixed(2)}<br/>
         <strong>Image Count:</strong> ${d.image_count}<br/>
+        <strong>Script Count:</strong> ${d.script_count}<br/>
+        <strong>Stylesheet Count:</strong> ${d.stylesheet_count}<br/>
+        <strong>Has Viewport Meta:</strong> ${
+          d.has_viewport_meta ? "Yes" : "No"
+        }<br/>
+        <strong>Heading Count:</strong> ${d.heading_count}<br/>
+        <strong>Paragraph Count:</strong> ${d.paragraph_count}<br/>
         <strong>Status Code:</strong> ${d.status_code}<br/>
         <strong>Response Time:</strong> ${d.response_time.toFixed(
           2
@@ -206,6 +218,10 @@ function calculateScorecard(site_structure) {
       acc.readability_score += page.readability_score || 0;
       acc.sentiment += page.sentiment || 0;
       acc.image_count += page.image_count || 0;
+      acc.script_count += page.script_count || 0;
+      acc.stylesheet_count += page.stylesheet_count || 0;
+      acc.heading_count += page.heading_count || 0;
+      acc.paragraph_count += page.paragraph_count || 0;
       acc.response_time += page.response_time || 0;
 
       acc.internal_links += page.internal_links.length || 0;
@@ -219,6 +235,8 @@ function calculateScorecard(site_structure) {
       acc.status_codes[page.status_code] =
         (acc.status_codes[page.status_code] || 0) + 1;
 
+      acc.viewport_meta_count += page.has_viewport_meta ? 1 : 0;
+
       return acc;
     },
     {
@@ -226,11 +244,16 @@ function calculateScorecard(site_structure) {
       readability_score: 0,
       sentiment: 0,
       image_count: 0,
+      script_count: 0,
+      stylesheet_count: 0,
+      heading_count: 0,
+      paragraph_count: 0,
       response_time: 0,
       internal_links: 0,
       external_links: 0,
       keyword_density: {},
       status_codes: {},
+      viewport_meta_count: 0,
     }
   );
 
@@ -283,6 +306,23 @@ function displayScorecard(scorecard) {
   list
     .append("li")
     .html(`<strong>Total Images:</strong> ${scorecard.image_count}`);
+  list
+    .append("li")
+    .html(`<strong>Total Scripts:</strong> ${scorecard.script_count}`);
+  list
+    .append("li")
+    .html(`<strong>Total Stylesheets:</strong> ${scorecard.stylesheet_count}`);
+  list
+    .append("li")
+    .html(`<strong>Total Headings:</strong> ${scorecard.heading_count}`);
+  list
+    .append("li")
+    .html(`<strong>Total Paragraphs:</strong> ${scorecard.paragraph_count}`);
+  list
+    .append("li")
+    .html(
+      `<strong>Pages with Viewport Meta:</strong> ${scorecard.viewport_meta_count}`
+    );
   list
     .append("li")
     .html(`<strong>Total Internal Links:</strong> ${scorecard.internal_links}`);
