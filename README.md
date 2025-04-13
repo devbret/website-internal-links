@@ -1,6 +1,6 @@
 # Mapping A Website's Internal Links
 
-![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/11d81827-cb66-407e-bdb1-c196e4954882.png)
+![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/ad55b31e-edf3-4a21-a6a2-3e61f4d84a0b.jpg)
 
 Use Python to explore a website's internal links. Then apply D3 to visualize those connections as an interactive network graph with scorecards.
 
@@ -18,7 +18,7 @@ Use Python to explore a website's internal links. Then apply D3 to visualize tho
 3. Clone this repository using `git` by running the following command: `git clone git@github.com:devbret/website-internal-links.git`.
 4. Navigate to the repo's directory by running: `cd website-internal-links`.
 5. Install the needed dependencies for running the script by running: `pip install -r requirements.txt`.
-6. Edit the app.py file on line 119, to include the website you would like to visualize. Also edit the app.py file on line 19 to specify how many pages you would like to crawl.
+6. Edit the app.py file on line 154, to include the website you would like to visualize. Also edit the app.py file on line 51 to specify how many pages you would like to crawl.
 7. Run the script with the command `python3 app.py`.
 8. To view the website's connections using the index.html file you will need to run a local web server. To do this run: `python3 -m http.server`.
 9. Once the network map has been launched, hover over any given node for more information about the particular web page. By clicking on a node, you will be sent to the related URL address.

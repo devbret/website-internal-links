@@ -16,6 +16,38 @@ nltk.download('stopwords')
 def is_internal(url, base):
     return urlparse(url).netloc == urlparse(base).netloc
 
+def check_heading_structure(soup):
+    headings = [int(tag.name[1]) for tag in soup.find_all(re.compile('^h[1-6]$'))]
+    skipped_levels = []
+    prev_level = 0
+    for level in headings:
+        if prev_level and level > prev_level + 1:
+            skipped_levels.append((prev_level, level))
+        prev_level = level
+    return skipped_levels
+
+def check_semantic_elements(soup):
+    semantic_tags = ['main', 'nav', 'article', 'section', 'header', 'footer', 'aside']
+    used_semantics = {tag: bool(soup.find(tag)) for tag in semantic_tags}
+    return used_semantics
+
+def check_image_alts(soup):
+    images = soup.find_all('img')
+    images_without_alt = [img['src'] for img in images if not img.get('alt')]
+    return images_without_alt
+
+def check_form_labels(soup):
+    inputs = soup.find_all(['input', 'textarea', 'select'])
+    labeled_inputs = set()
+    for label in soup.find_all('label'):
+        if label.get('for'):
+            labeled_inputs.add(label['for'])
+    inputs_without_labels = []
+    for field in inputs:
+        if field.get('id') and field['id'] not in labeled_inputs:
+            inputs_without_labels.append(field['id'])
+    return inputs_without_labels
+
 def crawl_site(start_url, max_links=25):
     visited = set()
     site_structure = {}
@@ -48,22 +80,16 @@ def crawl_site(start_url, max_links=25):
             word_count = len(text.split())
 
             readability_score = textstat.flesch_kincaid_grade(text)
-
             sentiment = TextBlob(text).sentiment.polarity
 
             text_clean = re.sub(r'[^\w\s]', '', text.lower())
-
             tokens = nltk.word_tokenize(text_clean)
 
             stop_words = set(stopwords.words('english'))
             filtered_tokens = [word for word in tokens if word not in stop_words and word.isalpha()]
-
             word_freq = Counter(filtered_tokens)
-
             total_filtered_words = sum(word_freq.values())
-
             most_common = word_freq.most_common(10)
-
             keyword_density = {word: count / total_filtered_words for word, count in most_common}
 
             image_count = len(soup.find_all('img'))
@@ -72,6 +98,11 @@ def crawl_site(start_url, max_links=25):
             has_viewport_meta = bool(soup.find('meta', attrs={'name': 'viewport'}))
             heading_count = len(soup.find_all(['h2', 'h3', 'h4', 'h5', 'h6']))
             paragraph_count = len(soup.find_all('p'))
+
+            semantic_elements = check_semantic_elements(soup)
+            heading_issues = check_heading_structure(soup)
+            unlabeled_inputs = check_form_labels(soup)
+            images_without_alt = check_image_alts(soup)
 
             internal_links = []
             external_links = []
@@ -103,7 +134,11 @@ def crawl_site(start_url, max_links=25):
                 "status_code": status_code,
                 "response_time": response_time,
                 "internal_links": internal_links,
-                "external_links": external_links
+                "external_links": external_links,
+                "semantic_elements": semantic_elements,
+                "heading_issues": heading_issues,
+                "unlabeled_inputs": unlabeled_inputs,
+                "images_without_alt": images_without_alt
             }
 
         except requests.exceptions.RequestException as e:

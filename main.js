@@ -24,6 +24,10 @@ d3.json("links.json").then(function (site_structure) {
       paragraph_count: data.paragraph_count || 0,
       internal_links: data.internal_links || [],
       external_links: data.external_links || [],
+      semantic_elements: data.semantic_elements || {},
+      heading_issues: data.heading_issues || [],
+      unlabeled_inputs: data.unlabeled_inputs || [],
+      images_without_alt: data.images_without_alt || [],
     };
   }
 
@@ -122,43 +126,57 @@ d3.json("links.json").then(function (site_structure) {
         .join("<br/>") || "";
 
     const tooltipContent = `
-        <strong>Title:</strong> ${d.title}<br/>
-        <strong>URL:</strong> <a href="${d.id}" target="_blank">${d.id}</a><br/>
-        <strong>Connections:</strong> ${connectedLinks}<br/>
-        <strong>Meta Description:</strong> ${d.meta_description}<br/>
-        <strong>Meta Keywords:</strong> ${d.meta_keywords}<br/>
-        <strong>H1 Tags:</strong> ${d.h1_tags.join(", ") || "None"}<br/>
-        <strong>Word Count:</strong> ${d.word_count}<br/>
-        <strong>Unigram Density:</strong><br/>${keywordDensityFormatted}<br/>
-        <strong>Readability Score:</strong> ${d.readability_score.toFixed(
-          2
-        )}<br/>
-        <strong>Sentiment:</strong> ${d.sentiment.toFixed(2)}<br/>
-        <strong>Image Count:</strong> ${d.image_count}<br/>
-        <strong>Script Count:</strong> ${d.script_count}<br/>
-        <strong>Stylesheet Count:</strong> ${d.stylesheet_count}<br/>
-        <strong>Has Viewport Meta:</strong> ${
-          d.has_viewport_meta ? "Yes" : "No"
-        }<br/>
-        <strong>Heading Count:</strong> ${d.heading_count}<br/>
-        <strong>Paragraph Count:</strong> ${d.paragraph_count}<br/>
-        <strong>Status Code:</strong> ${d.status_code}<br/>
-        <strong>Response Time:</strong> ${d.response_time.toFixed(
-          2
-        )} seconds<br/>
-        <strong>Number Of Internal Links:</strong> ${
-          d.internal_links.length
-        } links<br/>
-        <strong>Number Of External Links:</strong> ${
-          d.external_links.length
-        } links
+      <li><strong>Title:</strong> ${d.title}</li>
+      <li><strong>URL:</strong> <a href="${d.id}" target="_blank">${
+      d.id
+    }</a></li>
+      <li><strong>Connections:</strong> ${connectedLinks}</li>
+      <li><strong>Meta Description:</strong> ${d.meta_description}</li>
+      <li><strong>Meta Keywords:</strong> ${d.meta_keywords}</li>
+      <li><strong>H1 Tags:</strong> ${d.h1_tags.join(", ") || "None"}</li>
+      <li><strong>Word Count:</strong> ${d.word_count}</li>
+      <li><strong>Unigram Density:</strong><br/>${keywordDensityFormatted}</li>
+      <li><strong>Readability Score:</strong> ${d.readability_score.toFixed(
+        2
+      )}</li>
+      <li><strong>Sentiment:</strong> ${d.sentiment.toFixed(2)}</li>
+      <li><strong>Image Count:</strong> ${d.image_count}</li>
+      <li><strong>Script Count:</strong> ${d.script_count}</li>
+      <li><strong>Stylesheet Count:</strong> ${d.stylesheet_count}</li>
+      <li><strong>Has Viewport Meta:</strong> ${
+        d.has_viewport_meta ? "Yes" : "No"
+      }</li>
+      <li><strong>Heading Count:</strong> ${d.heading_count}</li>
+      <li><strong>Paragraph Count:</strong> ${d.paragraph_count}</li>
+      <li><strong>Status Code:</strong> ${d.status_code}</li>
+      <li><strong>Response Time:</strong> ${d.response_time.toFixed(
+        2
+      )} seconds</li>
+      <li><strong>Number Of Internal Links:</strong> ${
+        d.internal_links.length
+      } links</li>
+      <li><strong>Number Of External Links:</strong> ${
+        d.external_links.length
+      } links</li>
+      <li><strong>Semantic Elements:</strong><br/>${Object.entries(
+        d.semantic_elements
+      )
+        .map(([tag, present]) => `${tag}: ${present ? "✔️" : "❌"}`)
+        .join("<br/>")}</li>
+      <li><strong>Heading Structure Issues:</strong> ${
+        d.heading_issues.length > 0
+          ? d.heading_issues.map((pair) => `${pair[0]} → ${pair[1]}`).join(", ")
+          : "None"
+      }</li>
+      <li><strong>Unlabeled Inputs:</strong> ${
+        d.unlabeled_inputs.length > 0 ? d.unlabeled_inputs.join(", ") : "None"
+      }</li>
+      <li><strong>Images Without Alt Text:</strong> ${
+        d.images_without_alt.length > 0 ? d.images_without_alt.length : "None"
+      }</li>
     `;
 
-    d3.select("#tooltip")
-      .style("opacity", 1)
-      .html(tooltipContent)
-      .style("left", `${event.pageX + 15}px`)
-      .style("top", `${event.pageY - 28}px`);
+    d3.select("#tooltip-scorecard-list").html(tooltipContent);
 
     d3.select(this).style("cursor", "pointer");
 
@@ -185,7 +203,7 @@ d3.json("links.json").then(function (site_structure) {
   }
 
   function mouseout() {
-    d3.select("#tooltip").style("opacity", 0);
+    d3.select("#tooltip-scorecard-list").html("");
     node.classed("dimmed", false).classed("highlight", false);
     link.classed("dimmed", false).classed("highlight", false);
     d3.select(this).style("cursor", "auto");
@@ -237,6 +255,15 @@ function calculateScorecard(site_structure) {
 
       acc.viewport_meta_count += page.has_viewport_meta ? 1 : 0;
 
+      for (const [tag, present] of Object.entries(
+        page.semantic_elements || {}
+      )) {
+        if (present) acc.semantic_elements[tag]++;
+      }
+      acc.heading_issues += (page.heading_issues || []).length;
+      acc.unlabeled_inputs += (page.unlabeled_inputs || []).length;
+      acc.images_without_alt += (page.images_without_alt || []).length;
+
       return acc;
     },
     {
@@ -254,6 +281,18 @@ function calculateScorecard(site_structure) {
       keyword_density: {},
       status_codes: {},
       viewport_meta_count: 0,
+      semantic_elements: {
+        main: 0,
+        nav: 0,
+        article: 0,
+        section: 0,
+        header: 0,
+        footer: 0,
+        aside: 0,
+      },
+      heading_issues: 0,
+      unlabeled_inputs: 0,
+      images_without_alt: 0,
     }
   );
 
@@ -329,6 +368,27 @@ function displayScorecard(scorecard) {
   list
     .append("li")
     .html(`<strong>Total External Links:</strong> ${scorecard.external_links}`);
+
+  list
+    .append("li")
+    .html(
+      `<strong>Heading Issues Detected:</strong> ${scorecard.heading_issues}`
+    );
+  list
+    .append("li")
+    .html(`<strong>Unlabeled Inputs:</strong> ${scorecard.unlabeled_inputs}`);
+  list
+    .append("li")
+    .html(
+      `<strong>Images Without Alt Text:</strong> ${scorecard.images_without_alt}`
+    );
+
+  const semanticUsed = Object.entries(scorecard.semantic_elements)
+    .map(([tag, count]) => `${tag}: ${count}`)
+    .join(", ");
+  list
+    .append("li")
+    .html(`<strong>Semantic Element Usage:</strong> ${semanticUsed}`);
 
   const keywordList = Object.entries(scorecard.keyword_density)
     .sort(([, densityA], [, densityB]) => densityB - densityA)
