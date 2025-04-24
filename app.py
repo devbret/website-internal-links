@@ -13,6 +13,12 @@ import re
 nltk.download('punkt')
 nltk.download('stopwords')
 
+# The website you would like to visualize.
+website_to_crawl='https://example.com'
+
+# Specify how many pages you would like to crawl.
+website_crawl_level=10
+
 def is_internal(url, base):
     return urlparse(url).netloc == urlparse(base).netloc
 
@@ -48,7 +54,7 @@ def check_form_labels(soup):
             inputs_without_labels.append(field['id'])
     return inputs_without_labels
 
-def crawl_site(start_url, max_links=25):
+def crawl_site(start_url, max_links=website_crawl_level):
     visited = set()
     site_structure = {}
 
@@ -151,5 +157,5 @@ def save_links_as_json(site_structure, filename='links.json'):
     with open(filename, 'w') as file:
         json.dump(site_structure, file, indent=2)
 
-site_structure = crawl_site('https://www.example.com/')
+site_structure = crawl_site(website_to_crawl)
 save_links_as_json(site_structure)
