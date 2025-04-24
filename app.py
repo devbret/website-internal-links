@@ -14,7 +14,7 @@ nltk.download('punkt')
 nltk.download('stopwords')
 
 # The website you would like to visualize.
-WEBSITE_TO_CRAWL = 'https://ba-calderonmorales.github.io/my-life-as-a-dev/'
+WEBSITE_TO_CRAWL = 'https://example.com'
 
 # Specify how many pages you would like to crawl.
 MAX_PAGES_TO_CRAWL = 20
