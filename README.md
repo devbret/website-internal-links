@@ -21,12 +21,12 @@ Use Python to explore a website's internal links. Then apply D3 to visualize tho
 
 4. Navigate to the repo's directory by running: `cd website-internal-links`.
 
-5. Create a virtual environment with this command: `python3 -m venv venv`. Then activate your virutal environment using: `source venv/bin/activate`.
+5. Create a virtual environment with this command: `python3 -m venv venv`. Then activate your virtual environment using: `source venv/bin/activate`.
 
 6. Install the needed dependencies for running the script by running: `pip install -r requirements.txt`.
 
-7. Edit the app.py file `website_to_crawl` variable (on line 17), this is the website you would like to visualize.
-    - Also edit the app.py file `website_crawl_level` variable (on line 20), this specifies how many pages you would like to crawl.
+7. Edit the app.py file `WEBSITE_TO_CRAWL` variable (on line 17), this is the website you would like to visualize.
+    - Also edit the app.py file `MAX_PAGES_TO_CRAWL` variable (on line 20), this specifies how many pages you would like to crawl.
 
 8. Run the script with the command `python3 app.py`.
 
