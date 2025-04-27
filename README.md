@@ -26,7 +26,8 @@ Use Python to explore a website's internal links. Then apply D3 to visualize tho
 6. Install the needed dependencies for running the script by running: `pip install -r requirements.txt`.
 
 7. Edit the app.py file `WEBSITE_TO_CRAWL` variable (on line 17), this is the website you would like to visualize.
-    - Also edit the app.py file `MAX_PAGES_TO_CRAWL` variable (on line 20), this specifies how many pages you would like to crawl.
+
+   - Also edit the app.py file `MAX_PAGES_TO_CRAWL` variable (on line 20), this specifies how many pages you would like to crawl.
 
 8. Run the script with the command `python3 app.py`.
 
@@ -43,9 +44,11 @@ Generating visualizations for this app takes an unexpectedly large amount of pro
 ## Troubleshooting
 
 If working with GitHub codespaces, you may have to:
-    - `python -m nltk.downloader punkt_tab`
-    - reattempt steps 7 - 10 
 
-All else fails, contact the maintainer on here or via LinkedIn.
+- `python -m nltk.downloader punkt_tab`
+
+- Then reattempt steps 7 - 10.
+
+If all else fails, please contact the maintainer here on GitHub or via LinkedIn.
 
 Cheers!
