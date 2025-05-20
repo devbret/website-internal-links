@@ -1,3 +1,5 @@
-links.json
-.vscode/
 venv/
+__pycache__/
+.vscode/
+.env
+links.json

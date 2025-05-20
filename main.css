@@ -68,6 +68,8 @@ svg {
   max-width: 400px;
   min-width: 400px;
   min-height: 600px;
+  max-height: 90vh;
+  overflow-y: scroll;
   position: absolute;
   z-index: 100;
 }
@@ -81,10 +83,23 @@ svg {
   top: 20px;
   right: 20px;
   font-size: 12px;
+  max-height: 90vh;
+  overflow-y: scroll;
 }
 
 #scorecard-list,
 #tooltip-scorecard-list {
   list-style: none;
   padding: 0;
+}
+
+#claude-analysis-section {
+  display: none;
+  margin-top: 15px;
+}
+
+#analyze-node-button {
+  display: block;
+  margin: 0px auto 25px;
+  padding: 4px 6px;
 }
