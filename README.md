@@ -2,7 +2,7 @@
 
 ![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/ad55b31e-edf3-4a21-a6a2-3e61f4d84a0b.jpg)
 
-Use Python to explore a website's internal links, then visualize those connections as an interactive network graph with scorecards and analysis feature using the Claude AI API.
+Explore a website's internal links, then visualize those connections as a network graph with scorecards and analysis using Claude AI.
 
 ## Set Up
 
