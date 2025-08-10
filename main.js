@@ -1,3 +1,24 @@
+function idOf(x) {
+  return typeof x === "string" ? x : x?.id;
+}
+
+const statusColor = d3
+  .scaleOrdinal()
+  .domain(["2xx", "3xx", "4xx", "5xx", "other"])
+  .range(["aqua", "#f59e0b", "#ef4444", "#a855f7", "#64748b"]);
+
+function statusBucket(code) {
+  if (!code) return "other";
+  const s = String(code);
+  const head = +s[0];
+  return { 2: "2xx", 3: "3xx", 4: "4xx", 5: "5xx" }[head] || "other";
+}
+
+const isGreen = (d) => statusBucket(d.status_code) === "2xx";
+const GREEN_FADE_OPACITY = 0.25;
+
+let currentlySelectedNode = null;
+
 d3.json("links.json")
   .then(function (site_structure) {
     if (!site_structure || Object.keys(site_structure).length === 0) {
@@ -60,6 +81,17 @@ d3.json("links.json")
       return;
     }
 
+    const degreeById = (() => {
+      const counts = new Map();
+      links.forEach((l) => {
+        const s = idOf(l.source);
+        const t = idOf(l.target);
+        counts.set(s, (counts.get(s) || 0) + 1);
+        counts.set(t, (counts.get(t) || 0) + 1);
+      });
+      return counts;
+    })();
+
     const width = window.innerWidth;
     const height = window.innerHeight;
 
@@ -68,11 +100,139 @@ d3.json("links.json")
       .append("svg")
       .attr("width", width)
       .attr("height", height);
+
     const container = svg.append("g");
+
     const zoomHandler = d3
       .zoom()
       .on("zoom", (event) => container.attr("transform", event.transform));
     svg.call(zoomHandler).call(zoomHandler.transform, d3.zoomIdentity);
+
+    const defs = svg.append("defs");
+    defs
+      .append("marker")
+      .attr("id", "arrow")
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 18)
+      .attr("refY", 0)
+      .attr("markerWidth", 6)
+      .attr("markerHeight", 6)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5")
+      .attr("fill", "magenta");
+
+    const link = container
+      .append("g")
+      .attr("class", "links")
+      .selectAll("path")
+      .data(links)
+      .enter()
+      .append("path")
+      .attr("class", "link")
+      .attr("stroke", "#999")
+      .attr("stroke-opacity", 0.6)
+      .attr("fill", "none")
+      .attr("marker-end", "url(#arrow)")
+      .style("pointer-events", "none");
+
+    const ARROW_URL = "url(#arrow)";
+
+    function showArrowheadsForNeighbors(nodeId) {
+      link.attr("marker-end", (l) =>
+        idOf(l.source) === nodeId || idOf(l.target) === nodeId
+          ? ARROW_URL
+          : null
+      );
+    }
+
+    function restoreAllArrowheads() {
+      link.attr("marker-end", ARROW_URL);
+    }
+
+    const node = container
+      .append("g")
+      .attr("class", "nodes")
+      .selectAll("circle")
+      .data(nodes)
+      .enter()
+      .append("circle")
+      .attr("r", (d) =>
+        Math.max(6, Math.min(24, (degreeById.get(d.id) || 1) * 1.2))
+      )
+      .attr("fill", (d) => statusColor(statusBucket(d.status_code)))
+      .attr("stroke", "black")
+      .attr("stroke-width", 1.5)
+      .on("mouseover", mouseover)
+      .on("mouseout", mouseout)
+      .on("click", (event, d) => {
+        highlightNeighborhood(d.id);
+        currentlySelectedNode = d;
+      })
+      .on("dblclick", (event, d) => {
+        window.open(d.id, "_blank");
+      })
+      .call(
+        d3
+          .drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended)
+      );
+
+    const labels = container
+      .append("g")
+      .attr("class", "labels")
+      .selectAll("text")
+      .data(nodes)
+      .enter()
+      .append("text")
+      .attr("class", "node-label")
+      .attr("font-size", 10)
+      .attr("pointer-events", "none")
+      .attr("display", "none")
+      .text((d) => d.title || new URL(d.id).pathname);
+
+    function groupKey(url) {
+      const u = new URL(url);
+      const seg = u.pathname.split("/").filter(Boolean)[0] || "/";
+      return `${u.hostname}/${seg}`;
+    }
+    const groups = d3.group(nodes, (d) => groupKey(d.id));
+    const groupColor = d3.scaleOrdinal([...groups.keys()], d3.schemeTableau10);
+    const hullLayer = container
+      .insert("g", ":first-child")
+      .attr("class", "hulls")
+      .style("pointer-events", "none");
+
+    function drawHulls() {
+      const hullData = [...groups].map(([k, arr]) => {
+        const pts = d3.polygonHull(
+          arr
+            .filter((d) => Number.isFinite(d.x) && Number.isFinite(d.y))
+            .map((d) => [d.x, d.y])
+        );
+        return { k, pts };
+      });
+
+      const path = hullLayer.selectAll("path").data(
+        hullData.filter((h) => h.pts && h.pts.length > 2),
+        (d) => d.k
+      );
+
+      path
+        .enter()
+        .append("path")
+        .attr("fill", (d) => groupColor(d.k))
+        .attr("fill-opacity", 0.06)
+        .attr("stroke", (d) => groupColor(d.k))
+        .attr("stroke-opacity", 0.4)
+        .attr("stroke-width", 1.2)
+        .merge(path)
+        .attr("d", (d) => "M" + d.pts.join("L") + "Z");
+
+      path.exit().remove();
+    }
 
     const simulation = d3
       .forceSimulation(nodes)
@@ -82,66 +242,71 @@ d3.json("links.json")
           .forceLink(links)
           .id((d) => d.id)
           .distance(430)
+          .strength(0.8)
       )
       .force("charge", d3.forceManyBody().strength(-300))
-      .force("center", d3.forceCenter(width / 2, height / 2));
-
-    const link = container
-      .append("g")
-      .attr("class", "links")
-      .selectAll("line")
-      .data(links)
-      .enter()
-      .append("line")
-      .attr("class", "link");
-
-    const node = container
-      .append("g")
-      .attr("class", "nodes")
-      .selectAll("circle")
-      .data(nodes)
-      .enter()
-      .append("circle")
-      .attr("r", 10)
-      .attr("fill", "magenta")
-      .attr("stroke", "black")
-      .attr("stroke-width", 2)
-      .on("mouseover", mouseover)
-      .on("mouseout", mouseout)
-      .on("click", (event, d) => window.open(d.id, "_blank"))
-      .call(
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force(
+        "collide",
         d3
-          .drag()
-          .on("start", dragstarted)
-          .on("drag", dragged)
-          .on("end", dragended)
-      );
+          .forceCollide()
+          .radius((d) => Math.max(10, (degreeById.get(d.id) || 1) + 6))
+          .iterations(1)
+      )
+      .alphaDecay(0.03);
 
     simulation.on("tick", () => {
-      link
-        .attr("x1", (d) => d.source.x)
-        .attr("y1", (d) => d.source.y)
-        .attr("x2", (d) => d.target.x)
-        .attr("y2", (d) => d.target.y);
+      link.attr("d", (d) => {
+        const sx = d.source.x,
+          sy = d.source.y,
+          tx = d.target.x,
+          ty = d.target.y;
+        const dx = tx - sx;
+        const dy = ty - sy;
+        const dr = Math.hypot(dx, dy) * 0.6;
+        return `M${sx},${sy}A${dr},${dr} 0 0,1 ${tx},${ty}`;
+      });
+
       node.attr("cx", (d) => d.x).attr("cy", (d) => d.y);
+      labels.attr("x", (d) => d.x + 10).attr("y", (d) => d.y + 4);
+
+      drawHulls();
+    });
+
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        svg.attr("width", w).attr("height", h);
+        simulation.force("center", d3.forceCenter(w / 2, h / 2));
+        simulation.alpha(0.2).restart();
+      }, 150);
     });
 
     function mouseover(event, d) {
+      d3.select(this).raise();
+
       const claudeDiv = document.querySelector("#claude-analysis-section");
       const claudeOutput = document.querySelector("#claude-analysis-output");
-      claudeDiv.style.display = "block";
-      claudeOutput.innerHTML = "";
+      if (claudeDiv && claudeOutput) {
+        claudeDiv.style.display = "block";
+        claudeOutput.innerHTML = "";
+      }
 
       currentlySelectedNode = d;
 
       const connectedLinks = links.filter(
-        (l) => l.source.id === d.id || l.target.id === d.id
+        (l) =>
+          (l.source.id || l.source) === d.id ||
+          (l.target.id || l.target) === d.id
       ).length;
 
       const keywordDensityFormatted =
         d.keyword_density && Object.keys(d.keyword_density).length > 0
           ? Object.entries(d.keyword_density)
-              .filter(([keyword, density]) => density > 0)
+              .filter(([_, density]) => density > 0)
               .sort((a, b) => b[1] - a[1])
               .slice(0, 5)
               .map(
@@ -152,72 +317,72 @@ d3.json("links.json")
           : "N/A";
 
       const tooltipContent = `
-      <li><strong>Title:</strong> ${d.title || "N/A"}</li>
-      <li><strong>URL:</strong> <a href="${d.id}" target="_blank">${
-        d.id
-      }</a></li>
-      <li><strong>Connections:</strong> ${connectedLinks}</li>
-      <li><strong>Meta Description:</strong> ${d.meta_description || "N/A"}</li>
-      <li><strong>Meta Keywords:</strong> ${d.meta_keywords || "N/A"}</li>
-      <li><strong>H1 Tags:</strong> ${
-        d.h1_tags && d.h1_tags.length > 0 ? d.h1_tags.join(", ") : "None"
-      }</li>
-      <li><strong>Word Count:</strong> ${d.word_count}</li>
-      <li><strong>Unigram Density:</strong><br/>${keywordDensityFormatted}</li>
-      <li><strong>Readability Score:</strong> ${
-        typeof d.readability_score === "number"
-          ? d.readability_score.toFixed(2)
-          : "N/A"
-      }</li>
-      <li><strong>Sentiment:</strong> ${
-        typeof d.sentiment === "number" ? d.sentiment.toFixed(2) : "N/A"
-      }</li>
-      <li><strong>Image Count:</strong> ${d.image_count}</li>
-      <li><strong>Script Count:</strong> ${d.script_count}</li>
-      <li><strong>Stylesheet Count:</strong> ${d.stylesheet_count}</li>
-      <li><strong>Has Viewport Meta:</strong> ${
-        d.has_viewport_meta ? "Yes" : "No"
-      }</li>
-      <li><strong>Heading Count:</strong> ${d.heading_count}</li>
-      <li><strong>Paragraph Count:</strong> ${d.paragraph_count}</li>
-      <li><strong>Status Code:</strong> ${d.status_code || "N/A"}</li>
-      <li><strong>Response Time:</strong> ${
-        typeof d.response_time === "number"
-          ? d.response_time.toFixed(2) + " seconds"
-          : "N/A"
-      }</li>
-      <li><strong>Number Of Internal Links:</strong> ${
-        d.internal_links ? d.internal_links.length : 0
-      } links</li>
-      <li><strong>Number Of External Links:</strong> ${
-        d.external_links ? d.external_links.length : 0
-      } links</li>
-      <li><strong>Semantic Elements:</strong><br/>${
-        d.semantic_elements && Object.keys(d.semantic_elements).length > 0
-          ? Object.entries(d.semantic_elements)
-              .map(([tag, present]) => `${tag}: ${present ? "✔️" : "❌"}`)
-              .join("<br/>")
-          : "N/A"
-      }</li>
-      <li><strong>Heading Structure Issues:</strong> ${
-        d.heading_issues && d.heading_issues.length > 0
-          ? d.heading_issues.map((pair) => `${pair[0]} → ${pair[1]}`).join(", ")
-          : "None"
-      }</li>
-      <li><strong>Unlabeled Inputs:</strong> ${
-        d.unlabeled_inputs && d.unlabeled_inputs.length > 0
-          ? d.unlabeled_inputs.join(", ")
-          : "None"
-      }</li>
-      <li><strong>Images Without Alt Text:</strong> ${
-        d.images_without_alt && d.images_without_alt.length > 0
-          ? d.images_without_alt.length
-          : "None"
-      }</li>
-    `;
-
+    <li><strong>Title:</strong> ${d.title || "N/A"}</li>
+    <li><strong>URL:</strong> <a href="${d.id}" target="_blank">${d.id}</a></li>
+    <li><strong>Connections:</strong> ${connectedLinks}</li>
+    <li><strong>Meta Description:</strong> ${d.meta_description || "N/A"}</li>
+    <li><strong>Meta Keywords:</strong> ${d.meta_keywords || "N/A"}</li>
+    <li><strong>H1 Tags:</strong> ${
+      d.h1_tags && d.h1_tags.length > 0 ? d.h1_tags.join(", ") : "None"
+    }</li>
+    <li><strong>Word Count:</strong> ${d.word_count}</li>
+    <li><strong>Unigram Density:</strong><br/>${keywordDensityFormatted}</li>
+    <li><strong>Readability Score:</strong> ${
+      typeof d.readability_score === "number"
+        ? d.readability_score.toFixed(2)
+        : "N/A"
+    }</li>
+    <li><strong>Sentiment:</strong> ${
+      typeof d.sentiment === "number" ? d.sentiment.toFixed(2) : "N/A"
+    }</li>
+    <li><strong>Image Count:</strong> ${d.image_count}</li>
+    <li><strong>Script Count:</strong> ${d.script_count}</li>
+    <li><strong>Stylesheet Count:</strong> ${d.stylesheet_count}</li>
+    <li><strong>Has Viewport Meta:</strong> ${
+      d.has_viewport_meta ? "Yes" : "No"
+    }</li>
+    <li><strong>Heading Count:</strong> ${d.heading_count}</li>
+    <li><strong>Paragraph Count:</strong> ${d.paragraph_count}</li>
+    <li><strong>Status Code:</strong> ${d.status_code || "N/A"}</li>
+    <li><strong>Response Time:</strong> ${
+      typeof d.response_time === "number"
+        ? d.response_time.toFixed(2) + " seconds"
+        : "N/A"
+    }</li>
+    <li><strong>Number Of Internal Links:</strong> ${
+      d.internal_links ? d.internal_links.length : 0
+    } links</li>
+    <li><strong>Number Of External Links:</strong> ${
+      d.external_links ? d.external_links.length : 0
+    } links</li>
+    <li><strong>Semantic Elements:</strong><br/>${
+      d.semantic_elements && Object.keys(d.semantic_elements).length > 0
+        ? Object.entries(d.semantic_elements)
+            .map(([tag, present]) => `${tag}: ${present ? "✔️" : "❌"}`)
+            .join("<br/>")
+        : "N/A"
+    }</li>
+    <li><strong>Heading Structure Issues:</strong> ${
+      d.heading_issues && d.heading_issues.length > 0
+        ? d.heading_issues.map((pair) => `${pair[0]} → ${pair[1]}`).join(", ")
+        : "None"
+    }</li>
+    <li><strong>Unlabeled Inputs:</strong> ${
+      d.unlabeled_inputs && d.unlabeled_inputs.length > 0
+        ? d.unlabeled_inputs.join(", ")
+        : "None"
+    }</li>
+    <li><strong>Images Without Alt Text:</strong> ${
+      d.images_without_alt && d.images_without_alt.length > 0
+        ? d.images_without_alt.length
+        : "None"
+    }</li>
+  `;
       d3.select("#tooltip-scorecard-list").html(tooltipContent);
+
       d3.select(this).style("cursor", "pointer");
+      labels.filter((l) => l === d).attr("display", null);
+
       node.classed("dimmed", true);
       link.classed("dimmed", true);
       node
@@ -226,20 +391,37 @@ d3.json("links.json")
             n === d ||
             links.some(
               (l) =>
-                (l.source.id === d.id && l.target.id === n.id) ||
-                (l.target.id === d.id && l.source.id === n.id)
+                ((l.source.id || l.source) === d.id &&
+                  (l.target.id || l.target) === n.id) ||
+                ((l.target.id || l.target) === d.id &&
+                  (l.source.id || l.source) === n.id)
             )
         )
         .classed("dimmed", false)
         .classed("highlight", true);
       link
-        .filter((l) => l.source.id === d.id || l.target.id === d.id)
+        .filter(
+          (l) =>
+            (l.source.id || l.source) === d.id ||
+            (l.target.id || l.target) === d.id
+        )
         .classed("dimmed", false)
         .classed("highlight", true);
+
+      if (isGreen(d)) {
+        node.each(function (n) {
+          if (n !== d && isGreen(n))
+            d3.select(this).style("opacity", GREEN_FADE_OPACITY);
+        });
+      }
+
+      showArrowheadsForNeighbors(d.id);
     }
 
     function mouseout(event, d) {
       d3.select(this).style("cursor", "auto");
+      labels.filter((l) => l === d).attr("display", "none");
+
       node
         .filter((n) => n !== currentlySelectedNode)
         .classed("dimmed", false)
@@ -247,11 +429,15 @@ d3.json("links.json")
       link
         .filter(
           (l) =>
-            l.source.id !== currentlySelectedNode?.id &&
-            l.target.id !== currentlySelectedNode?.id
+            (l.source.id || l.source) !== currentlySelectedNode?.id &&
+            (l.target.id || l.target) !== currentlySelectedNode?.id
         )
         .classed("dimmed", false)
         .classed("highlight", false);
+
+      node.filter((n) => isGreen(n)).style("opacity", null);
+
+      restoreAllArrowheads();
     }
 
     function dragstarted(event, d) {
@@ -270,6 +456,41 @@ d3.json("links.json")
       d.fx = null;
       d.fy = null;
     }
+
+    function neighborsOf(id) {
+      const set = new Set([id]);
+      links.forEach((l) => {
+        const s = idOf(l.source);
+        const t = idOf(l.target);
+        if (s === id) set.add(t);
+        if (t === id) set.add(s);
+      });
+      return set;
+    }
+
+    function highlightNeighborhood(id) {
+      const keep = neighborsOf(id);
+      node.classed("dimmed", (d) => !keep.has(d.id));
+      link.classed(
+        "dimmed",
+        (l) => !(keep.has(idOf(l.source)) && keep.has(idOf(l.target)))
+      );
+      node.classed("highlight", (d) => keep.has(d.id));
+      link.classed(
+        "highlight",
+        (l) => keep.has(idOf(l.source)) && keep.has(idOf(l.target))
+      );
+    }
+
+    function clearHighlight() {
+      node.classed("dimmed", false).classed("highlight", false);
+      link.classed("dimmed", false).classed("highlight", false);
+      restoreAllArrowheads();
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") clearHighlight();
+    });
   })
   .catch(function (error) {
     console.error("Error loading or processing links.json:", error);
@@ -479,7 +700,6 @@ function displayScorecard(scorecard) {
   list
     .append("li")
     .html(`<strong>Total External Links:</strong> ${scorecard.external_links}`);
-
   list
     .append("li")
     .html(
@@ -502,7 +722,7 @@ function displayScorecard(scorecard) {
     .html(`<strong>Semantic Element Usage:</strong><br/>${semanticUsed}`);
 
   const keywordList = Object.entries(scorecard.keyword_density)
-    .sort(([, densityA], [, densityB]) => densityB - densityA)
+    .sort(([, a], [, b]) => b - a)
     .slice(0, 10)
     .map(
       ([keyword, density]) =>
@@ -548,8 +768,6 @@ d3.json("links.json")
       .append("li")
       .html(`<strong>Error loading scorecard data:</strong> ${error.message}`);
   });
-
-let currentlySelectedNode = null;
 
 d3.json("links.json")
   .then((loaded_site_structure) => {
