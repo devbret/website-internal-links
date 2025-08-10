@@ -1,6 +1,6 @@
 # Mapping A Website's Internal Links
 
-![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/ad55b31e-edf3-4a21-a6a2-3e61f4d84a0b.jpg)
+![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/2022e25c-32a3-40e1-b4c6-f6783d5a7d94.jpg)
 
 Explore a website's internal links, then visualize those connections as a network graph with scorecards and analysis using Claude AI.
 
