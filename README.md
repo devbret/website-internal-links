@@ -1,6 +1,6 @@
 # Mapping A Website's Internal Links
 
-![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/2022e25c-32a3-40e1-b4c6-f6783d5a7d94.jpg)
+![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/b0ff2b96-c2f3-42e2-a772-40a6943c1400.jpg)
 
 Explore a website's internal links, then visualize those connections as a network graph with scorecards and analysis using Claude AI.
 
@@ -45,17 +45,19 @@ Generating visualizations for this app takes an unexpectedly large amount of pro
 
 ## Additional Notes
 
-The analysis uses textstat for readability and TextBlob for sentiment.
+We use textstat for readability and TextBlob for sentiment. Beyond headings, alt text, labels and semantic tags, the crawler also records:
 
-The crawler checks for SEO and accessibility markers like:
+- Status/Timing: status code, TTFB, total response time
 
-- Heading structure
+- Structure: word counts, H1s, paragraphs
 
-- Image alt tags
+- Links: internal/external, depth, orphan pages
 
-- Form label usage
+- SEO: canonical, JSON-LD, OpenGraph, Twitter, hreflang
 
-- Semantic HTML elements
+- Security/Delivery: CSP/HSTS headers, redirects, mixed content, cookies
+
+- Language: `lang` vs detected
 
 ## Troubleshooting
 
