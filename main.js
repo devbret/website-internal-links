@@ -31,31 +31,56 @@ d3.json("links.json")
     const links = [];
 
     function getNodeData(url) {
-      const data = site_structure[url] || {};
+      const d = site_structure[url] || {};
       return {
         id: url,
-        title: data.title || "",
-        meta_description: data.meta_description || "",
-        meta_keywords: data.meta_keywords || "",
-        h1_tags: data.h1_tags || [],
-        word_count: data.word_count || 0,
-        status_code: data.status_code || "",
-        response_time: data.response_time || 0,
-        readability_score: data.readability_score || 0,
-        sentiment: data.sentiment || 0,
-        keyword_density: data.keyword_density || {},
-        image_count: data.image_count || 0,
-        script_count: data.script_count || 0,
-        stylesheet_count: data.stylesheet_count || 0,
-        has_viewport_meta: data.has_viewport_meta || false,
-        heading_count: data.heading_count || 0,
-        paragraph_count: data.paragraph_count || 0,
-        internal_links: data.internal_links || [],
-        external_links: data.external_links || [],
-        semantic_elements: data.semantic_elements || {},
-        heading_issues: data.heading_issues || [],
-        unlabeled_inputs: data.unlabeled_inputs || [],
-        images_without_alt: data.images_without_alt || [],
+
+        title: d.title || "",
+        meta_description: d.meta_description || "",
+        meta_keywords: d.meta_keywords || "",
+        h1_tags: d.h1_tags || [],
+        word_count: d.word_count || 0,
+        status_code: d.status_code || "",
+        response_time: d.response_time || 0,
+        readability_score: d.readability_score || 0,
+        sentiment: d.sentiment || 0,
+        keyword_density: d.keyword_density || {},
+        image_count: d.image_count || 0,
+        script_count: d.script_count || 0,
+        stylesheet_count: d.stylesheet_count || 0,
+        has_viewport_meta: !!d.has_viewport_meta,
+        heading_count: d.heading_count || 0,
+        paragraph_count: d.paragraph_count || 0,
+        internal_links: d.internal_links || [],
+        external_links: d.external_links || [],
+        semantic_elements: d.semantic_elements || {},
+        heading_issues: d.heading_issues || [],
+        unlabeled_inputs: d.unlabeled_inputs || [],
+        images_without_alt: d.images_without_alt || [],
+
+        depth: d.depth ?? null,
+        ttfb: d.ttfb || 0,
+        in_degree: d.in_degree || 0,
+        out_degree: d.out_degree || 0,
+        is_orphan: !!d.is_orphan,
+
+        http_delivery: d.http_delivery || {},
+        security: d.security || {},
+        mixed_content: d.mixed_content || [],
+
+        structured: d.structured || {},
+        a11y_extras: d.a11y_extras || {},
+
+        text_hash: d.text_hash || "",
+        read_time_minutes: d.read_time_minutes || 0,
+        lang_attribute: d.lang_attribute || "",
+        detected_language: d.detected_language || "",
+        language_match: d.language_match,
+
+        link_rel: d.link_rel || [],
+        media_hints: d.media_hints || {},
+
+        site_wide: d.site_wide || null,
       };
     }
 
@@ -150,6 +175,15 @@ d3.json("links.json")
       link.attr("marker-end", ARROW_URL);
     }
 
+    const sizeModes = {
+      degree: (d) =>
+        Math.max(6, Math.min(26, (degreeById.get(d.id) || 1) * 1.4)),
+      words: (d) => Math.max(6, Math.sqrt(d.word_count || 0) * 0.4 + 6),
+      speed: (d) => Math.max(6, 24 - Math.min(20, (d.response_time || 0) * 4)),
+      ttfb: (d) => Math.max(6, 24 - Math.min(20, (d.ttfb || 0) * 8)),
+    };
+    let sizeMode = "degree";
+
     const node = container
       .append("g")
       .attr("class", "nodes")
@@ -157,17 +191,16 @@ d3.json("links.json")
       .data(nodes)
       .enter()
       .append("circle")
-      .attr("r", (d) =>
-        Math.max(6, Math.min(24, (degreeById.get(d.id) || 1) * 1.2))
-      )
+      .attr("r", (d) => sizeModes[sizeMode](d))
       .attr("fill", (d) => statusColor(statusBucket(d.status_code)))
-      .attr("stroke", "black")
-      .attr("stroke-width", 1.5)
+      .attr("stroke", (d) => (hasIssues(d) ? "#ef4444" : "black"))
+      .attr("stroke-width", (d) => (hasIssues(d) ? 2.5 : 1.5))
       .on("mouseover", mouseover)
       .on("mouseout", mouseout)
       .on("click", (event, d) => {
         highlightNeighborhood(d.id);
         currentlySelectedNode = d;
+        renderInspector(d);
       })
       .on("dblclick", (event, d) => {
         window.open(d.id, "_blank");
@@ -212,7 +245,7 @@ d3.json("links.json")
             .filter((d) => Number.isFinite(d.x) && Number.isFinite(d.y))
             .map((d) => [d.x, d.y])
         );
-        return { k, pts };
+        return { k, pts, arr };
       });
 
       const path = hullLayer.selectAll("path").data(
@@ -226,8 +259,8 @@ d3.json("links.json")
         .attr("fill", (d) => groupColor(d.k))
         .attr("fill-opacity", 0.06)
         .attr("stroke", (d) => groupColor(d.k))
-        .attr("stroke-opacity", 0.4)
-        .attr("stroke-width", 1.2)
+        .attr("stroke-opacity", (d) => (sectionHasIssues(d.arr) ? 0.9 : 0.4))
+        .attr("stroke-width", (d) => (sectionHasIssues(d.arr) ? 2.2 : 1.2))
         .merge(path)
         .attr("d", (d) => "M" + d.pts.join("L") + "Z");
 
@@ -316,16 +349,75 @@ d3.json("links.json")
               .join("<br/>")
           : "N/A";
 
+      const hasCSP = !!(d.security && d.security.content_security_policy);
+      const hasHSTS = !!(d.security && d.security.strict_transport_security);
+      const canonical = d.structured?.canonical || "";
+      const jsonldCount = Array.isArray(d.structured?.jsonld)
+        ? d.structured.jsonld.length
+        : 0;
+      const hreflangCount = Array.isArray(d.structured?.hreflang)
+        ? d.structured.hreflang.length
+        : 0;
+      const ogPresent =
+        d.structured && d.structured.opengraph
+          ? Object.keys(d.structured.opengraph).length > 0
+          : false;
+      const twPresent =
+        d.structured && d.structured.twitter
+          ? Object.keys(d.structured.twitter).length > 0
+          : false;
+
+      const cookieCount = Array.isArray(d.http_delivery?.set_cookies)
+        ? d.http_delivery.set_cookies.length
+        : 0;
+
+      const redirectHops = Array.isArray(d.http_delivery?.redirect_chain)
+        ? d.http_delivery.redirect_chain.length - 1
+        : 0;
+
+      const lazyCount = d.media_hints?.lazy_images_count || 0;
+      const largestImg = d.media_hints?.largest_image || {};
+      const largestImgText = largestImg.src
+        ? `${largestImg.width}×${largestImg.height}`
+        : "N/A";
+
+      const mixedCount = Array.isArray(d.mixed_content)
+        ? d.mixed_content.length
+        : 0;
+
+      const langBadge =
+        d.language_match === true
+          ? "✓"
+          : d.language_match === false
+          ? "✗"
+          : "—";
+
+      const preloadCounts = countPreloadKinds(d.link_rel);
+
       const tooltipContent = `
-    <li><strong>Title:</strong> ${d.title || "N/A"}</li>
+    <li><strong>Title:</strong> ${escapeHtml(d.title || "N/A")}</li>
     <li><strong>URL:</strong> <a href="${d.id}" target="_blank">${d.id}</a></li>
     <li><strong>Connections:</strong> ${connectedLinks}</li>
-    <li><strong>Meta Description:</strong> ${d.meta_description || "N/A"}</li>
-    <li><strong>Meta Keywords:</strong> ${d.meta_keywords || "N/A"}</li>
+
+    <li><strong>Status Code:</strong> ${d.status_code || "N/A"}</li>
+    <li><strong>TTFB:</strong> ${fmtSec(d.ttfb)}</li>
+    <li><strong>Total Response Time:</strong> ${fmtSec(d.response_time)}</li>
+    <li><strong>Depth:</strong> ${numOrNA(d.depth)}</li>
+    <li><strong>In/Out Degree:</strong> ${d.in_degree || 0} / ${
+        d.out_degree || 0
+      } ${d.is_orphan ? "(orphan)" : ""}</li>
+
+    <li><strong>Meta Description:</strong> ${escapeHtml(
+      d.meta_description || "N/A"
+    )}</li>
     <li><strong>H1 Tags:</strong> ${
-      d.h1_tags && d.h1_tags.length > 0 ? d.h1_tags.join(", ") : "None"
+      d.h1_tags && d.h1_tags.length > 0
+        ? d.h1_tags.map(escapeHtml).join(", ")
+        : "None"
     }</li>
-    <li><strong>Word Count:</strong> ${d.word_count}</li>
+    <li><strong>Word Count:</strong> ${d.word_count} (≈${
+        d.read_time_minutes
+      } min read)</li>
     <li><strong>Unigram Density:</strong><br/>${keywordDensityFormatted}</li>
     <li><strong>Readability Score:</strong> ${
       typeof d.readability_score === "number"
@@ -335,26 +427,20 @@ d3.json("links.json")
     <li><strong>Sentiment:</strong> ${
       typeof d.sentiment === "number" ? d.sentiment.toFixed(2) : "N/A"
     }</li>
-    <li><strong>Image Count:</strong> ${d.image_count}</li>
-    <li><strong>Script Count:</strong> ${d.script_count}</li>
-    <li><strong>Stylesheet Count:</strong> ${d.stylesheet_count}</li>
+
+    <li><strong>Images:</strong> ${
+      d.image_count
+    } (lazy: ${lazyCount}, largest: ${largestImgText})</li>
+    <li><strong>Scripts / Stylesheets:</strong> ${d.script_count} / ${
+        d.stylesheet_count
+      }</li>
+    <li><strong>Preload | Prefetch | Preconnect:</strong> ${
+      preloadCounts.preload
+    } | ${preloadCounts.prefetch} | ${preloadCounts.preconnect}</li>
     <li><strong>Has Viewport Meta:</strong> ${
       d.has_viewport_meta ? "Yes" : "No"
     }</li>
-    <li><strong>Heading Count:</strong> ${d.heading_count}</li>
-    <li><strong>Paragraph Count:</strong> ${d.paragraph_count}</li>
-    <li><strong>Status Code:</strong> ${d.status_code || "N/A"}</li>
-    <li><strong>Response Time:</strong> ${
-      typeof d.response_time === "number"
-        ? d.response_time.toFixed(2) + " seconds"
-        : "N/A"
-    }</li>
-    <li><strong>Number Of Internal Links:</strong> ${
-      d.internal_links ? d.internal_links.length : 0
-    } links</li>
-    <li><strong>Number Of External Links:</strong> ${
-      d.external_links ? d.external_links.length : 0
-    } links</li>
+
     <li><strong>Semantic Elements:</strong><br/>${
       d.semantic_elements && Object.keys(d.semantic_elements).length > 0
         ? Object.entries(d.semantic_elements)
@@ -362,22 +448,65 @@ d3.json("links.json")
             .join("<br/>")
         : "N/A"
     }</li>
+    <li><strong>Landmarks Count:</strong><br/>${
+      d.a11y_extras?.landmarks_count
+        ? Object.entries(d.a11y_extras.landmarks_count)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join("<br/>")
+        : "N/A"
+    }</li>
+    <li><strong>Unlabeled Inputs:</strong> ${
+      d.unlabeled_inputs?.length ? d.unlabeled_inputs.join(", ") : "None"
+    }</li>
+    <li><strong>Images Without Alt:</strong> ${
+      d.images_without_alt?.length || 0
+    }</li>
+    <li><strong>Generic Link Texts:</strong> ${
+      d.a11y_extras?.generic_link_texts?.length
+        ? d.a11y_extras.generic_link_texts.length
+        : 0
+    }</li>
     <li><strong>Heading Structure Issues:</strong> ${
       d.heading_issues && d.heading_issues.length > 0
         ? d.heading_issues.map((pair) => `${pair[0]} → ${pair[1]}`).join(", ")
         : "None"
     }</li>
-    <li><strong>Unlabeled Inputs:</strong> ${
-      d.unlabeled_inputs && d.unlabeled_inputs.length > 0
-        ? d.unlabeled_inputs.join(", ")
-        : "None"
+
+    <li><strong>Security Headers:</strong> CSP ${hasCSP ? "✓" : "✗"} | HSTS ${
+        hasHSTS ? "✓" : "✗"
+      } | XFO ${yesNo(d.security?.x_frame_options)} | XCTO ${yesNo(
+        d.security?.x_content_type_options
+      )} | Referrer ${yesNo(d.security?.referrer_policy)}</li>
+    <li><strong>Mixed Content:</strong> ${mixedCount} ${
+        mixedCount > 0 ? "(http resources on https)" : ""
+      }</li>
+
+    <li><strong>Canonical:</strong> ${
+      canonical ? `<a href="${canonical}" target="_blank">present</a>` : "None"
     }</li>
-    <li><strong>Images Without Alt Text:</strong> ${
-      d.images_without_alt && d.images_without_alt.length > 0
-        ? d.images_without_alt.length
-        : "None"
-    }</li>
+    <li><strong>JSON-LD:</strong> ${jsonldCount} | <strong>OG:</strong> ${
+        ogPresent ? "✓" : "✗"
+      } | <strong>Twitter:</strong> ${twPresent ? "✓" : "✗"}</li>
+    <li><strong>Hreflang:</strong> ${hreflangCount}</li>
+
+    <li><strong>Lang:</strong> html="${escapeHtml(
+      d.lang_attribute || ""
+    )}" vs. detected="${d.detected_language || "unknown"}" (${langBadge})</li>
+
+    <li><strong>Server:</strong> ${escapeHtml(
+      d.http_delivery?.server || "N/A"
+    )} | <strong>Cache-Control:</strong> ${escapeHtml(
+        d.http_delivery?.cache_control || "N/A"
+      )} | <strong>Set-Cookie names:</strong> ${cookieCount} | <strong>Redirect hops:</strong> ${redirectHops}</li>
+
+    <li><strong>Number Of Internal Links:</strong> ${
+      d.internal_links ? d.internal_links.length : 0
+    } links</li>
+    <li><strong>Number Of External Links:</strong> ${
+      d.external_links ? d.external_links.length : 0
+    } links</li>
   `;
+
       d3.select("#tooltip-scorecard-list").html(tooltipContent);
 
       d3.select(this).style("cursor", "pointer");
@@ -490,6 +619,14 @@ d3.json("links.json")
 
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") clearHighlight();
+      if (e.key === "1") sizeMode = "degree";
+      if (e.key === "2") sizeMode = "words";
+      if (e.key === "3") sizeMode = "speed";
+      if (e.key === "4") sizeMode = "ttfb";
+      if ("1234".includes(e.key)) {
+        node.attr("r", (d) => sizeModes[sizeMode](d));
+        simulation.alpha(0.2).restart();
+      }
     });
   })
   .catch(function (error) {
@@ -517,6 +654,7 @@ function calculateScorecard(site_structure) {
       heading_count: 0,
       paragraph_count: 0,
       response_time: 0,
+      ttfb: 0,
       internal_links: 0,
       external_links: 0,
       keyword_density: {},
@@ -534,12 +672,52 @@ function calculateScorecard(site_structure) {
       heading_issues: 0,
       unlabeled_inputs: 0,
       images_without_alt: 0,
+
+      pages_with_csp: 0,
+      pages_with_hsts: 0,
+      pages_with_canonical: 0,
+      jsonld_total_blocks: 0,
+      hreflang_pairs_total: 0,
+      pages_with_mixed_content: 0,
+      mixed_content_resources_total: 0,
+      cookies_unique_names: new Set(),
+      redirect_hops_total: 0,
+      generic_link_texts_total: 0,
+      aria_roles: {},
+      landmarks_total: {
+        main: 0,
+        nav: 0,
+        header: 0,
+        footer: 0,
+        aside: 0,
+        section: 0,
+        article: 0,
+      },
+      lazy_images_total: 0,
+      preloads: { preload: 0, prefetch: 0, preconnect: 0 },
+      orphans_count: 0,
+      avg_depth: 0,
+      max_depth: 0,
+
       average_word_count: 0,
       average_readability_score: 0,
       average_sentiment: 0,
       average_response_time: 0,
+      average_ttfb: 0,
     };
   }
+
+  const ariaRolesAgg = {};
+  const landmarksAgg = {
+    main: 0,
+    nav: 0,
+    header: 0,
+    footer: 0,
+    aside: 0,
+    section: 0,
+    article: 0,
+  };
+  const cookiesSet = new Set();
 
   const aggregated = pageValues.reduce(
     (acc, page) => {
@@ -554,6 +732,7 @@ function calculateScorecard(site_structure) {
       acc.heading_count += page.heading_count || 0;
       acc.paragraph_count += page.paragraph_count || 0;
       acc.response_time += page.response_time || 0;
+      acc.ttfb += page.ttfb || 0;
 
       acc.internal_links += Array.isArray(page.internal_links)
         ? page.internal_links.length
@@ -584,6 +763,7 @@ function calculateScorecard(site_structure) {
           if (present) acc.semantic_elements[tag]++;
         }
       }
+
       acc.heading_issues += Array.isArray(page.heading_issues)
         ? page.heading_issues.length
         : 0;
@@ -593,6 +773,66 @@ function calculateScorecard(site_structure) {
       acc.images_without_alt += Array.isArray(page.images_without_alt)
         ? page.images_without_alt.length
         : 0;
+
+      const sec = page.security || {};
+      if (sec.content_security_policy) acc.pages_with_csp++;
+      if (sec.strict_transport_security) acc.pages_with_hsts++;
+
+      const st = page.structured || {};
+      if (st.canonical) acc.pages_with_canonical++;
+      if (Array.isArray(st.jsonld)) acc.jsonld_total_blocks += st.jsonld.length;
+      if (Array.isArray(st.hreflang))
+        acc.hreflang_pairs_total += st.hreflang.length;
+
+      if (Array.isArray(page.mixed_content) && page.mixed_content.length) {
+        acc.pages_with_mixed_content++;
+        acc.mixed_content_resources_total += page.mixed_content.length;
+      }
+
+      const del = page.http_delivery || {};
+      if (Array.isArray(del.set_cookies)) {
+        del.set_cookies.forEach((n) => cookiesSet.add(n));
+      }
+      if (Array.isArray(del.redirect_chain)) {
+        acc.redirect_hops_total += Math.max(0, del.redirect_chain.length - 1);
+      }
+
+      if (page.a11y_extras?.generic_link_texts) {
+        acc.generic_link_texts_total +=
+          page.a11y_extras.generic_link_texts.length;
+      }
+      if (page.a11y_extras?.aria_roles) {
+        for (const [role, count] of Object.entries(
+          page.a11y_extras.aria_roles
+        )) {
+          ariaRolesAgg[role] = (ariaRolesAgg[role] || 0) + count;
+        }
+      }
+      if (page.a11y_extras?.landmarks_count) {
+        for (const [tag, count] of Object.entries(
+          page.a11y_extras.landmarks_count
+        )) {
+          if (landmarksAgg[tag] != null) landmarksAgg[tag] += count || 0;
+        }
+      }
+
+      if (page.media_hints?.lazy_images_count)
+        acc.lazy_images_total += page.media_hints.lazy_images_count;
+
+      if (Array.isArray(page.link_rel)) {
+        const { preload, prefetch, preconnect } = countPreloadKinds(
+          page.link_rel
+        );
+        acc.preloads.preload += preload;
+        acc.preloads.prefetch += prefetch;
+        acc.preloads.preconnect += preconnect;
+      }
+
+      if (page.is_orphan) acc.orphans_count++;
+      if (Number.isFinite(page.depth)) {
+        acc.avg_depth += page.depth;
+        acc.max_depth = Math.max(acc.max_depth, page.depth);
+      }
 
       return acc;
     },
@@ -606,6 +846,7 @@ function calculateScorecard(site_structure) {
       heading_count: 0,
       paragraph_count: 0,
       response_time: 0,
+      ttfb: 0,
       internal_links: 0,
       external_links: 0,
       keyword_density: {},
@@ -623,17 +864,38 @@ function calculateScorecard(site_structure) {
       heading_issues: 0,
       unlabeled_inputs: 0,
       images_without_alt: 0,
+
+      pages_with_csp: 0,
+      pages_with_hsts: 0,
+      pages_with_canonical: 0,
+      jsonld_total_blocks: 0,
+      hreflang_pairs_total: 0,
+      pages_with_mixed_content: 0,
+      mixed_content_resources_total: 0,
+      cookies_unique_names: null,
+      redirect_hops_total: 0,
+      generic_link_texts_total: 0,
+      aria_roles: null,
+      landmarks_total: null,
+      lazy_images_total: 0,
+      preloads: { preload: 0, prefetch: 0, preconnect: 0 },
+      orphans_count: 0,
+      avg_depth: 0,
+      max_depth: 0,
     }
   );
 
-  aggregated.average_word_count =
-    totalPages > 0 ? aggregated.word_count / totalPages : 0;
-  aggregated.average_readability_score =
-    totalPages > 0 ? aggregated.readability_score / totalPages : 0;
-  aggregated.average_sentiment =
-    totalPages > 0 ? aggregated.sentiment / totalPages : 0;
-  aggregated.average_response_time =
-    totalPages > 0 ? aggregated.response_time / totalPages : 0;
+  aggregated.cookies_unique_names = cookiesSet;
+  aggregated.aria_roles = ariaRolesAgg;
+  aggregated.landmarks_total = landmarksAgg;
+
+  const total = totalPages > 0 ? totalPages : 1;
+  aggregated.average_word_count = aggregated.word_count / total;
+  aggregated.average_readability_score = aggregated.readability_score / total;
+  aggregated.average_sentiment = aggregated.sentiment / total;
+  aggregated.average_response_time = aggregated.response_time / total;
+  aggregated.average_ttfb = aggregated.ttfb / total;
+  aggregated.avg_depth = aggregated.avg_depth / total;
 
   return {
     totalPages,
@@ -643,6 +905,7 @@ function calculateScorecard(site_structure) {
 
 function displayScorecard(scorecard) {
   const list = d3.select("#scorecard-list").html("");
+
   list
     .append("li")
     .html(`<strong>Total Pages:</strong> ${scorecard.totalPages}`);
@@ -670,19 +933,35 @@ function displayScorecard(scorecard) {
   list
     .append("li")
     .html(
-      `<strong>Average Response Time:</strong> ${scorecard.average_response_time.toFixed(
-        2
+      `<strong>Average TTFB:</strong> ${scorecard.average_ttfb.toFixed(
+        3
       )} seconds`
     );
   list
     .append("li")
-    .html(`<strong>Total Images:</strong> ${scorecard.image_count}`);
+    .html(
+      `<strong>Average Response Time:</strong> ${scorecard.average_response_time.toFixed(
+        2
+      )} seconds`
+    );
+
+  list
+    .append("li")
+    .html(
+      `<strong>Total Images:</strong> ${scorecard.image_count} (lazy: ${scorecard.lazy_images_total})`
+    );
   list
     .append("li")
     .html(`<strong>Total Scripts:</strong> ${scorecard.script_count}`);
   list
     .append("li")
     .html(`<strong>Total Stylesheets:</strong> ${scorecard.stylesheet_count}`);
+  list
+    .append("li")
+    .html(
+      `<strong>Preload | Prefetch | Preconnect:</strong> ${scorecard.preloads.preload} | ${scorecard.preloads.prefetch} | ${scorecard.preloads.preconnect}`
+    );
+
   list
     .append("li")
     .html(`<strong>Total Headings:</strong> ${scorecard.heading_count}`);
@@ -694,12 +973,24 @@ function displayScorecard(scorecard) {
     .html(
       `<strong>Pages with Viewport Meta:</strong> ${scorecard.viewport_meta_count}`
     );
+
   list
     .append("li")
     .html(`<strong>Total Internal Links:</strong> ${scorecard.internal_links}`);
   list
     .append("li")
     .html(`<strong>Total External Links:</strong> ${scorecard.external_links}`);
+  list
+    .append("li")
+    .html(`<strong>Orphan Pages:</strong> ${scorecard.orphans_count}`);
+  list
+    .append("li")
+    .html(
+      `<strong>Average Depth:</strong> ${scorecard.avg_depth.toFixed(
+        2
+      )} (max: ${scorecard.max_depth})`
+    );
+
   list
     .append("li")
     .html(
@@ -713,6 +1004,51 @@ function displayScorecard(scorecard) {
     .html(
       `<strong>Images Without Alt Text:</strong> ${scorecard.images_without_alt}`
     );
+  list
+    .append("li")
+    .html(
+      `<strong>Generic Link Texts:</strong> ${scorecard.generic_link_texts_total}`
+    );
+
+  list
+    .append("li")
+    .html(`<strong>Pages with CSP:</strong> ${scorecard.pages_with_csp}`);
+  list
+    .append("li")
+    .html(`<strong>Pages with HSTS:</strong> ${scorecard.pages_with_hsts}`);
+  list
+    .append("li")
+    .html(
+      `<strong>Pages with Mixed Content:</strong> ${scorecard.pages_with_mixed_content} (resources: ${scorecard.mixed_content_resources_total})`
+    );
+  list
+    .append("li")
+    .html(
+      `<strong>Redirect Hops (total):</strong> ${scorecard.redirect_hops_total}`
+    );
+  list
+    .append("li")
+    .html(
+      `<strong>Unique Cookie Names Set:</strong> ${
+        Array.from(scorecard.cookies_unique_names || []).length
+      }`
+    );
+
+  list
+    .append("li")
+    .html(
+      `<strong>Pages with Canonical:</strong> ${scorecard.pages_with_canonical}`
+    );
+  list
+    .append("li")
+    .html(
+      `<strong>JSON-LD Blocks (total):</strong> ${scorecard.jsonld_total_blocks}`
+    );
+  list
+    .append("li")
+    .html(
+      `<strong>Hreflang Pairs (total):</strong> ${scorecard.hreflang_pairs_total}`
+    );
 
   const semanticUsed = Object.entries(scorecard.semantic_elements)
     .map(([tag, count]) => `${tag}: ${count}`)
@@ -721,14 +1057,29 @@ function displayScorecard(scorecard) {
     .append("li")
     .html(`<strong>Semantic Element Usage:</strong><br/>${semanticUsed}`);
 
+  const landmarksList = Object.entries(scorecard.landmarks_total || {})
+    .map(([tag, count]) => `${tag}: ${count}`)
+    .join("<br/>");
+  list
+    .append("li")
+    .html(`<strong>Landmarks (total):</strong><br/>${landmarksList || "N/A"}`);
+
+  const ariaList = Object.entries(scorecard.aria_roles || {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([role, count]) => `${role}: ${count}`)
+    .join("<br/>");
+  list
+    .append("li")
+    .html(`<strong>ARIA Roles (sum):</strong><br/>${ariaList || "N/A"}`);
+
   const keywordList = Object.entries(scorecard.keyword_density)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10)
     .map(
       ([keyword, density]) =>
-        `${keyword}: (Avg density ${(density / scorecard.totalPages).toFixed(
-          4
-        )})`
+        `${escapeHtml(keyword)}: (Avg density ${(
+          density / scorecard.totalPages
+        ).toFixed(4)})`
     )
     .join("<br/>");
   list
@@ -740,6 +1091,7 @@ function displayScorecard(scorecard) {
     );
 
   const statusList = Object.entries(scorecard.status_codes)
+    .sort((a, b) => +a[0] - +b[0])
     .map(([code, count]) => `${code}: ${count}`)
     .join("<br/>");
   list
@@ -756,7 +1108,7 @@ d3.json("links.json")
       const scorecard = calculateScorecard(loaded_site_structure);
       displayScorecard(scorecard);
     } else {
-      console.warn("No data for scorecard in the second d3.json call.");
+      console.warn("No data for scorecard in the d3.json call.");
       const list = d3.select("#scorecard-list").html("");
       list.append("li").text("No scorecard data loaded.");
     }
@@ -766,23 +1118,11 @@ d3.json("links.json")
     const list = d3.select("#scorecard-list").html("");
     list
       .append("li")
-      .html(`<strong>Error loading scorecard data:</strong> ${error.message}`);
-  });
-
-d3.json("links.json")
-  .then((loaded_site_structure) => {
-    if (
-      loaded_site_structure &&
-      Object.keys(loaded_site_structure).length > 0
-    ) {
-      const scorecard = calculateScorecard(loaded_site_structure);
-      displayScorecard(scorecard);
-    } else {
-      console.warn("No data for scorecard.");
-    }
-  })
-  .catch(function (error) {
-    console.error("Error loading links.json for scorecard:", error);
+      .html(
+        `<strong>Error loading scorecard data:</strong> ${escapeHtml(
+          error.message
+        )}`
+      );
   });
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -836,3 +1176,51 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Claude analysis output element not found.");
   }
 });
+
+function hasIssues(d) {
+  return (
+    (d.unlabeled_inputs?.length || 0) > 0 ||
+    (d.images_without_alt?.length || 0) > 0 ||
+    !d.semantic_elements?.main ||
+    (!!d.mixed_content && d.mixed_content.length > 0) ||
+    !d.security?.content_security_policy
+  );
+}
+
+function sectionHasIssues(arr) {
+  return arr.some((n) => hasIssues(n));
+}
+
+function countPreloadKinds(linkRelArr) {
+  const out = { preload: 0, prefetch: 0, preconnect: 0 };
+  if (!Array.isArray(linkRelArr)) return out;
+  linkRelArr.forEach((e) => {
+    const rel = (e.rel || "").toLowerCase();
+    if (rel.includes("preload")) out.preload++;
+    if (rel.includes("prefetch")) out.prefetch++;
+    if (rel.includes("preconnect")) out.preconnect++;
+  });
+  return out;
+}
+
+function fmtSec(v) {
+  if (typeof v !== "number" || !isFinite(v)) return "N/A";
+  return `${v.toFixed(3)} seconds`;
+}
+
+function numOrNA(v) {
+  return Number.isFinite(v) ? v : "N/A";
+}
+
+function yesNo(v) {
+  return v ? "✓" : "✗";
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
