@@ -182,6 +182,8 @@ d3.json("links.json")
       speed: (d) => Math.max(6, 24 - Math.min(20, (d.response_time || 0) * 4)),
       ttfb: (d) => Math.max(6, 24 - Math.min(20, (d.ttfb || 0) * 8)),
     };
+    sizeModes.hub = (d) =>
+      Math.max(6, Math.log1p((d.in_degree || 0) + (d.out_degree || 0)) * 6);
     let sizeMode = "degree";
 
     const node = container
@@ -226,6 +228,117 @@ d3.json("links.json")
       .attr("display", "none")
       .text((d) => d.title || new URL(d.id).pathname);
 
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+
+    const adj = new Map(nodes.map((n) => [n.id, new Set()]));
+    links.forEach((l) => {
+      const s = idOf(l.source),
+        t = idOf(l.target);
+      adj.get(s)?.add(t);
+      adj.get(t)?.add(s);
+    });
+
+    function getRootId() {
+      const depth0 = nodes.find((n) => (n.depth ?? 0) === 0);
+      if (depth0) return depth0.id;
+      return nodes
+        .slice()
+        .sort(
+          (a, b) =>
+            new URL(a.id).pathname.length - new URL(b.id).pathname.length
+        )[0].id;
+    }
+
+    function shortestPath(srcId, dstId) {
+      if (srcId === dstId) return [srcId];
+      const q = [srcId];
+      const prev = new Map([[srcId, null]]);
+      while (q.length) {
+        const v = q.shift();
+        for (const nb of adj.get(v) || []) {
+          if (!prev.has(nb)) {
+            prev.set(nb, v);
+            if (nb === dstId) {
+              const out = [dstId];
+              for (let cur = v; cur != null; cur = prev.get(cur)) out.push(cur);
+              return out.reverse();
+            }
+            q.push(nb);
+          }
+        }
+      }
+      return [];
+    }
+
+    function highlightPath(pathIds) {
+      if (!Array.isArray(pathIds) || pathIds.length === 0) return;
+
+      const pathSet = new Set(pathIds);
+      const edgeSet = new Set();
+      for (let i = 0; i < pathIds.length - 1; i++) {
+        const a = pathIds[i],
+          b = pathIds[i + 1];
+        edgeSet.add(a + "→" + b);
+        edgeSet.add(b + "→" + a);
+      }
+
+      node
+        .classed("highlight", (d) => pathSet.has(d.id))
+        .classed("dimmed", (d) => !pathSet.has(d.id));
+
+      link
+        .classed("highlight", (l) =>
+          edgeSet.has(idOf(l.source) + "→" + idOf(l.target))
+        )
+        .classed(
+          "dimmed",
+          (l) => !edgeSet.has(idOf(l.source) + "→" + idOf(l.target))
+        );
+
+      if (typeof ARROW_URL !== "undefined") {
+        link.attr("marker-end", (l) =>
+          edgeSet.has(idOf(l.source) + "→" + idOf(l.target)) ? ARROW_URL : null
+        );
+      }
+    }
+
+    node.on("click", (event, d) => {
+      currentlySelectedNode = d;
+
+      const rootId = getRootId();
+      const path = shortestPath(d.id, rootId);
+
+      if (path.length > 0) {
+        highlightPath(path);
+      } else {
+        highlightNeighborhood(d.id);
+      }
+
+      if (typeof renderInspector === "function") renderInspector(d);
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        clearHighlight?.();
+        if (typeof restoreAllArrowheads === "function") restoreAllArrowheads();
+      }
+    });
+
+    function issueScore(d) {
+      const unlabeled = d.unlabeled_inputs?.length || 0;
+      const noAlt = d.images_without_alt?.length || 0;
+      const mixed = d.mixed_content?.length || 0;
+      const noCSP = d.security?.content_security_policy ? 0 : 1;
+      const heading = d.heading_issues?.length || 0;
+      const isError = /^4|^5/.test(String(d.status_code)) ? 1 : 0;
+      return unlabeled + noAlt + mixed + noCSP + heading + isError;
+    }
+
+    const issueExtent = d3.extent(nodes, (d) => issueScore(d));
+    const colorByIssue = d3
+      .scaleSequential(d3.interpolateTurbo)
+      .domain([issueExtent[0] ?? 0, issueExtent[1] ?? 1]);
+
     function groupKey(url) {
       const u = new URL(url);
       const seg = u.pathname.split("/").filter(Boolean)[0] || "/";
@@ -256,7 +369,7 @@ d3.json("links.json")
       path
         .enter()
         .append("path")
-        .attr("fill", (d) => groupColor(d.k))
+        .attr("fill", (d) => colorByIssue(d))
         .attr("fill-opacity", 0.06)
         .attr("stroke", (d) => groupColor(d.k))
         .attr("stroke-opacity", (d) => (sectionHasIssues(d.arr) ? 0.9 : 0.4))
@@ -623,7 +736,8 @@ d3.json("links.json")
       if (e.key === "2") sizeMode = "words";
       if (e.key === "3") sizeMode = "speed";
       if (e.key === "4") sizeMode = "ttfb";
-      if ("1234".includes(e.key)) {
+      if (e.key === "5") sizeMode = "hub";
+      if ("12345".includes(e.key)) {
         node.attr("r", (d) => sizeModes[sizeMode](d));
         simulation.alpha(0.2).restart();
       }
@@ -1176,6 +1290,68 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Claude analysis output element not found.");
   }
 });
+
+(function createHotkeyLegend() {
+  const modes = [
+    { key: "1", label: "Degree" },
+    { key: "2", label: "Words" },
+    { key: "3", label: "Response" },
+    { key: "4", label: "TTFB" },
+    { key: "5", label: "Hubs" },
+  ];
+
+  const legend = d3
+    .select("body")
+    .append("div")
+    .attr("id", "hotkey-legend")
+    .attr("class", "legend-box");
+
+  legend.append("h4").text("Graph Controls");
+
+  const list = legend.append("ul").attr("class", "legend-list");
+
+  modes.forEach((m) => {
+    list
+      .append("li")
+      .attr("data-mode", m.label.toLowerCase())
+      .html(`<span class="key-hint">${m.key}</span> ${m.label}`)
+      .on("click", function () {
+        sizeMode = this.getAttribute("data-mode");
+        node.attr("r", (d) => sizeModes[sizeMode](d));
+        simulation.alpha(0.2).restart();
+        updateActiveLegend();
+      });
+  });
+
+  list.append("li").html(`<span class="key-hint">Click</span> Route home`);
+  list.append("li").html(`<span class="key-hint">Esc</span> Clear highlight`);
+
+  function updateActiveLegend() {
+    list.selectAll("li").classed("active", function () {
+      return this.getAttribute("data-mode") === sizeMode;
+    });
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") clearHighlight?.();
+    if ("12345".includes(e.key)) {
+      const map = {
+        1: "degree",
+        2: "words",
+        3: "speed",
+        4: "ttfb",
+        5: "hubs",
+      };
+      const mode = map[e.key];
+      sizeMode = mode;
+      node.attr("r", (d) => sizeModes[sizeMode](d));
+      simulation.alpha(0.2).restart();
+      updateActiveLegend();
+    }
+  });
+
+  updateActiveLegend();
+})();
 
 function hasIssues(d) {
   return (

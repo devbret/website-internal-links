@@ -1,6 +1,6 @@
 # Mapping A Website's Internal Links
 
-![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/b0ff2b96-c2f3-42e2-a772-40a6943c1400.jpg)
+![Preview Of Resulting Visualization](https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/f1949fc3-8240-4820-9ead-70aa2f5ef281.jpg)
 
 Explore a website's internal links, then visualize those connections as a network graph with scorecards and analysis using Claude AI.
 
@@ -58,6 +58,10 @@ We use textstat for readability and TextBlob for sentiment. Beyond headings, alt
 - Security/Delivery: CSP/HSTS headers, redirects, mixed content, cookies
 
 - Language: `lang` vs detected
+
+### Minor Features
+
+Upon clicking any node, the shortest route back to the homepage is highlghted, giving a clear visual of how deeply the page sits within the site structure. This feature uses a breadth-first search to trace paths efficiently, even in large crawls. The result is an intuitive way to explore navigation depth and connectivity directly within the visualization.
 
 ## Troubleshooting
 
