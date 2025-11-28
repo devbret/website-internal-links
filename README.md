@@ -39,10 +39,6 @@ Explore a website's internal links, then visualize those connections as a networ
 
 12. To exit the virtual environment (venv), type: `deactivate` in the terminal.
 
-## Performance Considerations
-
-Generating visualizations for this app takes an unexpectedly large amount of processing power. It is thus advisable to initially experiment with mapping less than one hundred pages per launch.
-
 ## Additional Notes
 
 We use textstat for readability and TextBlob for sentiment. Beyond headings, alt text, labels and semantic tags, the crawler also records:
@@ -62,6 +58,10 @@ We use textstat for readability and TextBlob for sentiment. Beyond headings, alt
 ### Minor Features
 
 Upon clicking any node, the shortest route back to the homepage is highlghted, giving a clear visual of how deeply the page sits within the site structure. This feature uses a breadth-first search to trace paths efficiently, even in large crawls. The result is an intuitive way to explore navigation depth and connectivity directly within the visualization.
+
+### Performance Considerations
+
+Generating visualizations with this app takes an unexpectedly large amount of processing power. It is advisable to experiment with mapping less than one hundred pages per launch.
 
 ## Troubleshooting
 
