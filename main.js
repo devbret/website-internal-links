@@ -58,6 +58,9 @@ d3.json("links.json")
         unlabeled_inputs: d.unlabeled_inputs || [],
         images_without_alt: d.images_without_alt || [],
 
+        text_content: d.text_content || "",
+        search_text: d.search_text || (d.text_content || "").toLowerCase(),
+
         depth: d.depth ?? null,
         ttfb: d.ttfb || 0,
         in_degree: d.in_degree || 0,
@@ -353,12 +356,15 @@ d3.json("links.json")
 
     function drawHulls() {
       const hullData = [...groups].map(([k, arr]) => {
+        const visibleArr = arr.filter((d) => !d._filteredOut);
+
         const pts = d3.polygonHull(
-          arr
+          visibleArr
             .filter((d) => Number.isFinite(d.x) && Number.isFinite(d.y))
             .map((d) => [d.x, d.y])
         );
-        return { k, pts, arr };
+
+        return { k, pts, arr: visibleArr };
       });
 
       const path = hullLayer.selectAll("path").data(
@@ -418,6 +424,86 @@ d3.json("links.json")
 
       drawHulls();
     });
+
+    const searchInput = document.getElementById("node-search");
+    const clearBtn = document.getElementById("node-search-clear");
+
+    if (searchInput) {
+      nodes.forEach((n) => (n._filteredOut = false));
+
+      function matchesQuery(d, keywords) {
+        const hay = (d.search_text || d.text_content || "").toLowerCase();
+        if (!hay) return false;
+        return keywords.every((kw) => hay.includes(kw));
+      }
+
+      function applyFilter(query) {
+        const keywords = query
+          .toLowerCase()
+          .split(/\s+/)
+          .map((k) => k.trim())
+          .filter(Boolean);
+
+        if (keywords.length === 0) {
+          nodes.forEach((n) => (n._filteredOut = false));
+
+          node.style("display", null).style("pointer-events", null);
+          labels.style("display", "none");
+          link.style("display", null);
+
+          drawHulls();
+          clearHighlight?.();
+          return;
+        }
+
+        const keepSet = new Set(
+          nodes.filter((n) => matchesQuery(n, keywords)).map((n) => n.id)
+        );
+
+        nodes.forEach((n) => (n._filteredOut = !keepSet.has(n.id)));
+
+        node
+          .style("display", (d) => (keepSet.has(d.id) ? null : "none"))
+          .style("pointer-events", (d) => (keepSet.has(d.id) ? null : "none"));
+
+        labels.style("display", (d) => (keepSet.has(d.id) ? null : "none"));
+
+        link.style("display", (l) => {
+          const s = idOf(l.source);
+          const t = idOf(l.target);
+          return keepSet.has(s) && keepSet.has(t) ? null : "none";
+        });
+
+        drawHulls();
+
+        if (currentlySelectedNode && !keepSet.has(currentlySelectedNode.id)) {
+          currentlySelectedNode = null;
+          clearHighlight?.();
+          d3.select("#tooltip-scorecard-list").html("");
+        }
+      }
+
+      let debounceTimer = null;
+      searchInput.addEventListener("input", (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          applyFilter(e.target.value || "");
+        }, 120);
+      });
+
+      clearBtn?.addEventListener("click", () => {
+        searchInput.value = "";
+        applyFilter("");
+        searchInput.focus();
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "/" && document.activeElement !== searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+        }
+      });
+    }
 
     let resizeTimer = null;
     window.addEventListener("resize", () => {

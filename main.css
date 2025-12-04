@@ -174,3 +174,37 @@ svg {
   color: #0077cc;
   border-color: #fff;
 }
+
+.scorecard-search {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.8rem 0;
+}
+
+#node-search {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #ffffff;
+  color: #e2e8f0;
+  outline: none;
+}
+
+#node-search::placeholder {
+  color: black;
+}
+
+#node-search-clear {
+  padding: 0 0.55rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+#node-search-clear:hover {
+  background: #1f2937;
+}
