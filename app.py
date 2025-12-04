@@ -329,6 +329,9 @@ def crawl_site(start_url, max_links=MAX_PAGES_TO_CRAWL):
             for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'span', 'article']):
                 text_content_for_analysis.append(element.get_text(separator=' ', strip=True))
             text = " ".join(text_content_for_analysis)
+            
+            text_content = text.strip()
+            search_text = re.sub(r'\s+', ' ', text_content).lower()
 
             word_count = len(text.split()) if text else 0
             readability_score = textstat.flesch_kincaid_grade(text) if text else 0
@@ -401,6 +404,8 @@ def crawl_site(start_url, max_links=MAX_PAGES_TO_CRAWL):
                 "meta_description": meta_description,
                 "meta_keywords": meta_keywords,
                 "h1_tags": h1_tags,
+                "text_content": text_content,
+                "search_text": search_text,
                 "word_count": word_count,
                 "readability_score": readability_score,
                 "sentiment": sentiment,

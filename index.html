@@ -1,14 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Mapping A Website's Internal Links</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mapping A Website's Internal Links - Bret Bernhoft</title>
     <script src="https://d3js.org/d3.v6.min.js"></script>
     <link rel="stylesheet" href="main.css" />
+    <link
+      rel="icon"
+      href="https://hosting.photobucket.com/bbcfb0d4-be20-44a0-94dc-65bff8947cf2/ff4a3384-baa9-4bc2-94c9-6bff4e3d3ea0.png"
+      sizes="any"
+    />
   </head>
   <body>
     <div id="scorecard" class="scorecard">
       <h3>Website Scorecard</h3>
       <ul id="scorecard-list"></ul>
+      <h3>Website Filters</h3>
+      <div class="scorecard-search">
+        <input
+          id="node-search"
+          type="search"
+          placeholder="Filter nodes by keyword(s)…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="node-search-clear" title="Clear search">×</button>
+      </div>
     </div>
 
     <div id="scorecard-right" class="scorecard">
