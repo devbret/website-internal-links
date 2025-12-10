@@ -20,6 +20,11 @@ h3 {
   font-size: 23px;
 }
 
+h4 {
+  text-align: center;
+  font-size: 15px;
+}
+
 .link {
   stroke: #888;
   stroke-opacity: 0.75;
@@ -72,6 +77,7 @@ svg {
   overflow-y: scroll;
   position: absolute;
   z-index: 100;
+  font-size: 12px;
 }
 
 #scorecard {
@@ -83,7 +89,7 @@ svg {
   top: 20px;
   right: 20px;
   font-size: 12px;
-  max-height: 90vh;
+  max-height: 80vh;
   overflow-y: scroll;
 }
 
@@ -187,8 +193,8 @@ svg {
   border-radius: 6px;
   border: 1px solid #334155;
   background: #ffffff;
-  color: #e2e8f0;
   outline: none;
+  color: #111827;
 }
 
 #node-search::placeholder {
@@ -205,6 +211,21 @@ svg {
   font-size: 1.1rem;
   line-height: 1;
 }
+
 #node-search-clear:hover {
   background: #1f2937;
+}
+
+#filters-box.filters-box {
+  right: 20px;
+  bottom: 20px;
+  top: auto;
+  min-height: 116px;
+  max-height: 116px;
+  height: auto;
+  min-width: 400px;
+  max-width: 400px;
+  overflow-y: visible;
+  font-size: 12px;
+  padding: 10px 12px;
 }
