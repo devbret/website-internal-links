@@ -541,14 +541,14 @@ function init(site) {
       .on("brush", (event) => {
         if (event.selection) {
           const [lo, hi] = event.selection.map(x.invert);
-          range.textContent = `${metric.fmt(lo)} – ${metric.fmt(hi)}`;
+          range.textContent = `${metric.fmt(lo)} - ${metric.fmt(hi)}`;
         }
       })
       .on("end", (event) => {
         if (event.selection) {
           const [lo, hi] = event.selection.map(x.invert);
           filters.set(metric.key, [lo, hi]);
-          range.textContent = `${metric.fmt(lo)} – ${metric.fmt(hi)}`;
+          range.textContent = `${metric.fmt(lo)} - ${metric.fmt(hi)}`;
         } else {
           filters.delete(metric.key);
           range.textContent = " ";
