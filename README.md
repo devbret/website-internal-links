@@ -4,13 +4,13 @@
 
 Crawl a website’s internal pages to extract SEO, accessibility, performance and link-structure data, then visualize the results as a D3 network graph with page scorecards and analysis from Claude.
 
-## Overview
+## Application Overview
 
 The Python crawler in `app.py` begins with a chosen website, visits up to a user-defined number of internal pages and extracts details about accessibility, performance, security, links and more. It then saves the generated site map and audit data to `links.json` before launching a `Flask` server for interactive analysis.
 
 On the frontend, `main.js` loads `links.json` and renders the crawled website as a D3 network graph, with pages represented as nodes and internal links shown as connections. The `Flask` backend in `flask_server.py` provides an API for analyzing selected pages, while `anthropic_api.py` sends each page’s structured crawl data to `Claude` for a review of SEO, accessibility and suggested improvements.
 
-## Set Up Instructions
+## Basic Setup Instructions
 
 Below are the required software programs and instructions for using this application on a Linux machine.
 
@@ -20,7 +20,7 @@ Below are the required software programs and instructions for using this applica
 
 - [Python](https://www.python.org/downloads/)
 
-### Steps
+### Setup Steps
 
 1. Install the above programs
 
@@ -62,6 +62,10 @@ Below are the required software programs and instructions for using this applica
 
 ## Other Considerations
 
+Below you will find additional context about the project beyond setup and usage. It highlights the technical abilities this repo is demonstrates, provides license information and offers troubleshooting tips for common issues.
+
+### Abilities Demonstrated
+
 This project repo is intended to demonstrate an ability to do the following:
 
 - Crawl a website’s internal pages and turn the structure into a JSON dataset
@@ -71,6 +75,10 @@ This project repo is intended to demonstrate an ability to do the following:
 - Visualize the website as a D3 network graph, making internal links easier to explore
 
 - Enable users to request analysis by `Claude` for improvement suggestions
+
+### License Information
+
+This project is released under the [MIT License](LICENSE). You are free to use, copy, modify, merge, publish, distribute, sublicense and/or sell copies of this software, provided the original copyright notice and permission notice are included in all copies or substantial portions of the software. The software is provided "as is", without a warranty of any kind.
 
 ### Troubleshooting
 
